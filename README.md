@@ -25,3 +25,8 @@ Video embed faqat sayt egasi ruxsat bergan va iframe orqali ochishga ruxsat bera
 - Native Android app: Kotlin, Jetpack Compose, AndroidX Media3.
 - Android TV focus navigation va telefon UI.
 - Ruxsat etilgan embed/player manbalari uchun alohida source adapterlar.
+
+
+## Android TV uchun player interfeysi
+
+Player oynasi televizor ekraniga mos keng ko‘rinish, katta fokuslanuvchi tugmalar, to‘liq ekran tugmasi va BACK/ESC orqali chiqishni qo‘llab-quvvatlaydi. Klaviatura/pultdagi F tugmasi to‘liq ekranni yoqadi. Video iframe bo‘lsa, Play/Pause, seek va ovoz boshqaruvlari tashqi video manbasining o‘z playeriga bog‘liq; YOUTUBE-2 boshqa sayt playerining ichki tugmalarini boshqara olmaydi.
