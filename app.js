@@ -13,7 +13,50 @@ function filteredMovies(){let a=[...movies];if(favoritesOnly)a=a.filter(m=>favor
 function posterMarkup(m){const u=safeHttpUrl(m.poster);return u?'<img loading="lazy" src="'+safeText(u)+'" alt="'+safeText(m.title)+'" onerror="this.remove()">':'<div class="poster-placeholder">▶</div>';}
 function render(){const list=filteredMovies();$("movieGrid").innerHTML=list.map(m=>'<article class="movie-card" data-id="'+safeText(m.id)+'" tabindex="0" role="button"><div class="poster">'+posterMarkup(m)+(m.featured?'<span class="poster-badge">TAVSIYA</span>':'')+'<span class="poster-type">'+safeText(m.type)+'</span></div><div class="movie-info"><div class="movie-title">'+safeText(m.title)+'</div><div class="movie-meta">'+safeText(m.year||"—")+' · '+safeText(m.genre||"Kino")+'</div></div></article>').join("");$("emptyState").classList.toggle("hidden",list.length!==0);$("resultCount").textContent=list.length+" ta kino";$("sectionTitle").textContent=favoritesOnly?"Sevimlilar":activeGenre||({Trend:"Trenddagi kinolar",Tarjima:"Tarjima kinolar",Serial:"Seriallar"}[activeCategory]||"Barcha kinolar");document.querySelectorAll(".chip").forEach(c=>c.classList.toggle("selected",c.dataset.filter===activeCategory&&!activeGenre&&!favoritesOnly));}
 function showMovie(id){const m=movies.find(x=>String(x.id)===String(id));if(!m)return;selectedMovie=m;$("dialogTitle").textContent=m.title;$("dialogMeta").textContent=[m.year,m.type,m.genre,m.language].filter(Boolean).join(" · ");$("dialogDescription").textContent=m.description||"Tavsif hali qo‘shilmagan.";$("dialogPoster").style.backgroundImage=safeHttpUrl(m.poster)?"url('"+safeHttpUrl(m.poster).replace(/'/g,"%27")+"')":"linear-gradient(110deg,#252525,#171717)";$("favoriteButton").textContent=favorites.has(String(id))?"♥ Sevimlilardan olish":"♡ Sevimlilarga";$("watchButton").disabled=!safeHttpUrl(m.url);$("watchButton").style.opacity=m.url?1:.5;$("sourceNote").textContent=m.url?"Manbaning embed ruxsati va mavjudligi sayt egasiga bog‘liq.":"Bu kinoga video manbasi qo‘shilmagan.";$("movieDialog").showModal();}
-function openPlayer(){if(!selectedMovie)return;const url=safeHttpUrl(selectedMovie.url);if(!url){toast("Bu kino uchun video manbasi qo‘shilmagan.");return;}const wrap=$("playerFrameWrap");wrap.replaceChildren();$("playerTitle").textContent=selectedMovie.title;const f=document.createElement("iframe");f.src=url;f.title=selectedMovie.title;f.allow="autoplay; fullscreen; picture-in-picture";f.allowFullscreen=true;f.referrerPolicy="strict-origin-when-cross-origin";wrap.append(f);$("movieDialog").close();$("playerDialog").showModal();}
+function openPlayer() {
+  if (!selectedMovie) return;
+
+  const url = safeHttpUrl(selectedMovie.url);
+
+  if (!url) {
+    toast("Bu kino uchun video manbasi qo‘shilmagan.");
+    return;
+  }
+
+  // Android TV native player
+  try {
+    if (
+      window.AndroidPlayer &&
+      typeof window.AndroidPlayer.playEmbed === "function"
+    ) {
+      window.AndroidPlayer.playEmbed(
+        url,
+        selectedMovie.title || "YOUTUBE-2",
+        location.href
+      );
+      return;
+    }
+  } catch (error) {
+    console.warn("Android player error:", error);
+  }
+
+  // Oddiy brauzer uchun iframe
+  const wrap = $("playerFrameWrap");
+  wrap.replaceChildren();
+
+  $("playerTitle").textContent = selectedMovie.title;
+
+  const frame = document.createElement("iframe");
+  frame.src = url;
+  frame.title = selectedMovie.title;
+  frame.allow = "autoplay; fullscreen; picture-in-picture";
+  frame.allowFullscreen = true;
+
+  wrap.append(frame);
+
+  $("movieDialog").close();
+  $("playerDialog").showModal();
+}
 function clearForm(){$("movieForm").reset();$("movieId").value="";$("movieLanguage").value="O‘zbek tilida";$("moviePublished").checked=true;}
 async function refreshAdmin(){const {data,error}=await db.from("movies").select("*").order("created_at",{ascending:false});if(error){toast("Admin katalogini yuklab bo‘lmadi: "+error.message);return;}const all=(data||[]).map(fromDb);$("adminCount").textContent=all.length+" ta";$("adminMovieList").innerHTML=all.map(m=>'<div class="admin-row"><div class="mini-poster"></div><div class="admin-row-title">'+safeText(m.title)+'<div class="movie-meta">'+safeText(m.year||"")+' · '+safeText(m.type)+' · '+(m.is_published?"Ommaviy":"Yashirin")+'</div></div><div class="admin-row-actions"><button data-edit="'+safeText(m.id)+'">Tahrir</button><button class="delete" data-delete="'+safeText(m.id)+'">O‘chir</button></div></div>').join("");}
 function updateAdminView(){const logged=!!adminUser;$("adminLoginSection").classList.toggle("hidden",logged);$("adminTools").classList.toggle("hidden",!logged);if(logged){$("adminIdentity").textContent=adminUser.email||"Admin";refreshAdmin();}}
