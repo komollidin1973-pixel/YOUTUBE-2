@@ -13,50 +13,79 @@ function filteredMovies(){let a=[...movies];if(favoritesOnly)a=a.filter(m=>favor
 function posterMarkup(m){const u=safeHttpUrl(m.poster);return u?'<img loading="lazy" src="'+safeText(u)+'" alt="'+safeText(m.title)+'" onerror="this.remove()">':'<div class="poster-placeholder">▶</div>';}
 function render(){const list=filteredMovies();$("movieGrid").innerHTML=list.map(m=>'<article class="movie-card" data-id="'+safeText(m.id)+'" tabindex="0" role="button"><div class="poster">'+posterMarkup(m)+(m.featured?'<span class="poster-badge">TAVSIYA</span>':'')+'<span class="poster-type">'+safeText(m.type)+'</span></div><div class="movie-info"><div class="movie-title">'+safeText(m.title)+'</div><div class="movie-meta">'+safeText(m.year||"—")+' · '+safeText(m.genre||"Kino")+'</div></div></article>').join("");$("emptyState").classList.toggle("hidden",list.length!==0);$("resultCount").textContent=list.length+" ta kino";$("sectionTitle").textContent=favoritesOnly?"Sevimlilar":activeGenre||({Trend:"Trenddagi kinolar",Tarjima:"Tarjima kinolar",Serial:"Seriallar"}[activeCategory]||"Barcha kinolar");document.querySelectorAll(".chip").forEach(c=>c.classList.toggle("selected",c.dataset.filter===activeCategory&&!activeGenre&&!favoritesOnly));}
 function showMovie(id){const m=movies.find(x=>String(x.id)===String(id));if(!m)return;selectedMovie=m;$("dialogTitle").textContent=m.title;$("dialogMeta").textContent=[m.year,m.type,m.genre,m.language].filter(Boolean).join(" · ");$("dialogDescription").textContent=m.description||"Tavsif hali qo‘shilmagan.";$("dialogPoster").style.backgroundImage=safeHttpUrl(m.poster)?"url('"+safeHttpUrl(m.poster).replace(/'/g,"%27")+"')":"linear-gradient(110deg,#252525,#171717)";$("favoriteButton").textContent=favorites.has(String(id))?"♥ Sevimlilardan olish":"♡ Sevimlilarga";$("watchButton").disabled=!safeHttpUrl(m.url);$("watchButton").style.opacity=m.url?1:.5;$("sourceNote").textContent=m.url?"Manbaning embed ruxsati va mavjudligi sayt egasiga bog‘liq.":"Bu kinoga video manbasi qo‘shilmagan.";$("movieDialog").showModal();}
+let activePlayerJS = null;
+
+function isDirectVideoUrl(url) {
+  return /\.(mp4|m3u8|mpd|webm)(?:$|[?#])/i.test(url);
+}
+
 function openPlayer() {
   if (!selectedMovie) return;
 
   const url = safeHttpUrl(selectedMovie.url);
-
   if (!url) {
     toast("Bu kino uchun video manbasi qo‘shilmagan.");
     return;
   }
 
-  // Android TV native player
-  try {
-    if (
-      window.AndroidPlayer &&
-      typeof window.AndroidPlayer.playEmbed === "function"
-    ) {
-      window.AndroidPlayer.playEmbed(
-        url,
-        selectedMovie.title || "YOUTUBE-2",
-        location.href
-      );
-      return;
-    }
-  } catch (error) {
-    console.warn("Android player error:", error);
-  }
-
-  // Oddiy brauzer uchun iframe
   const wrap = $("playerFrameWrap");
   wrap.replaceChildren();
-
-  $("playerTitle").textContent = selectedMovie.title;
-
-  const frame = document.createElement("iframe");
-  frame.src = url;
-  frame.title = selectedMovie.title;
-  frame.allow = "autoplay; fullscreen; picture-in-picture";
-  frame.allowFullscreen = true;
-
-  wrap.append(frame);
+  $("playerTitle").textContent = selectedMovie.title || "YOUTUBE-2";
 
   $("movieDialog").close();
   $("playerDialog").showModal();
+
+  // Direct MP4 / HLS / DASH sources use PlayerJS.
+  if (isDirectVideoUrl(url)) {
+    if (typeof window.Playerjs === "function") {
+      const playerBox = document.createElement("div");
+      playerBox.id = "youtube2Player";
+      playerBox.className = "youtube2-player";
+      wrap.append(playerBox);
+
+      try {
+        activePlayerJS = new window.Playerjs({
+          id: "youtube2Player",
+          file: url,
+          poster: safeHttpUrl(selectedMovie.poster),
+          title: selectedMovie.title || "YOUTUBE-2",
+          autoplay: 1
+        });
+        return;
+      } catch (error) {
+        console.error("PlayerJS ishga tushmadi:", error);
+        toast("PlayerJS ochilmadi. Video havolasini tekshiring.");
+        wrap.replaceChildren();
+      }
+    } else {
+      toast("PlayerJS fayli topilmadi. playerjs.js faylini saytga yuklang.");
+    }
+  }
+
+  // Embed pages remain in an iframe; PlayerJS cannot replace an arbitrary
+  // third-party embed page with a direct video player.
+  const frame = document.createElement("iframe");
+  frame.src = url;
+  frame.title = selectedMovie.title || "YOUTUBE-2";
+  frame.allow = "autoplay; fullscreen; picture-in-picture";
+  frame.allowFullscreen = true;
+  frame.referrerPolicy = "strict-origin-when-cross-origin";
+  wrap.append(frame);
 }
+
+function closePlayer() {
+  try {
+    if (activePlayerJS && typeof activePlayerJS.api === "function") {
+      activePlayerJS.api("stop");
+    }
+  } catch (error) {
+    console.warn("PlayerJS stop xatosi:", error);
+  }
+  activePlayerJS = null;
+  $("playerFrameWrap").replaceChildren();
+  $("playerDialog").close();
+}
+
 function clearForm(){$("movieForm").reset();$("movieId").value="";$("movieLanguage").value="O‘zbek tilida";$("moviePublished").checked=true;}
 async function refreshAdmin(){const {data,error}=await db.from("movies").select("*").order("created_at",{ascending:false});if(error){toast("Admin katalogini yuklab bo‘lmadi: "+error.message);return;}const all=(data||[]).map(fromDb);$("adminCount").textContent=all.length+" ta";$("adminMovieList").innerHTML=all.map(m=>'<div class="admin-row"><div class="mini-poster"></div><div class="admin-row-title">'+safeText(m.title)+'<div class="movie-meta">'+safeText(m.year||"")+' · '+safeText(m.type)+' · '+(m.is_published?"Ommaviy":"Yashirin")+'</div></div><div class="admin-row-actions"><button data-edit="'+safeText(m.id)+'">Tahrir</button><button class="delete" data-delete="'+safeText(m.id)+'">O‘chir</button></div></div>').join("");}
 function updateAdminView(){const logged=!!adminUser;$("adminLoginSection").classList.toggle("hidden",logged);$("adminTools").classList.toggle("hidden",!logged);if(logged){$("adminIdentity").textContent=adminUser.email||"Admin";refreshAdmin();}}
@@ -70,7 +99,7 @@ document.querySelectorAll("[data-genre]").forEach(b=>b.addEventListener("click",
 document.querySelectorAll("[data-filter]").forEach(b=>b.addEventListener("click",()=>{activeCategory=b.dataset.filter;activeGenre="";favoritesOnly=false;render();}));
 $("favoritesNav").addEventListener("click",()=>{favoritesOnly=true;activeGenre="";$("sidebar").classList.remove("open");render();});
 $("favoriteButton").addEventListener("click",()=>{if(!selectedMovie)return;const id=String(selectedMovie.id);if(favorites.has(id))favorites.delete(id);else favorites.add(id);localStorage.setItem(FAVORITES_KEY,JSON.stringify([...favorites]));$("favoriteButton").textContent=favorites.has(id)?"♥ Sevimlilardan olish":"♡ Sevimlilarga";render();});
-$("watchButton").addEventListener("click",openPlayer);$("dialogClose").addEventListener("click",()=>$("movieDialog").close());$("playerClose").addEventListener("click",()=>{$("playerFrameWrap").replaceChildren();$("playerDialog").close();});
+$("watchButton").addEventListener("click",openPlayer);$("dialogClose").addEventListener("click",()=>$("movieDialog").close());$("playerClose").addEventListener("click",closePlayer);
 $("adminToggle").addEventListener("click",()=>{$("adminDialog").showModal();updateAdminView();});$("adminClose").addEventListener("click",()=>$("adminDialog").close());$("resetForm").addEventListener("click",clearForm);
 $("loginForm").addEventListener("submit",async e=>{e.preventDefault();const {data,error}=await db.auth.signInWithPassword({email:$("adminEmail").value.trim(),password:$("adminPassword").value});if(error){toast("Kirish amalga oshmadi: "+error.message);return;}adminUser=data.user;updateAdminView();toast("Admin sifatida kirdingiz.");});
 $("logoutButton").addEventListener("click",async()=>{await db.auth.signOut();adminUser=null;updateAdminView();clearForm();toast("Tizimdan chiqdingiz.");});
