@@ -10,9 +10,9 @@
 <body>
 <header class="topbar">
   <button class="icon-button menu-toggle" id="menuToggle" aria-label="Menyuni ochish">☰</button>
-  <a class="brand" href="#"><span class="brand-mark">▶</span><span>YOUTUBE<span class="brand-dash">-2</span></span></a>
+  <a class="brand" id="brandSecret" href="#" aria-label="YOUTUBE-2 bosh sahifa"><span class="brand-mark">▶</span><span>YOUTUBE<span class="brand-dash">-2</span></span></a>
   <form class="search" id="searchForm"><input id="searchInput" placeholder="Kinolarni qidirish..." aria-label="Qidirish"><button aria-label="Qidirish">⌕</button></form>
-  <button class="admin-button" id="adminToggle">⚙ <span>Admin panel</span></button>
+  <button class="admin-button hidden" id="adminToggle" tabindex="-1" aria-hidden="true">Admin</button>
 </header>
 <aside class="sidebar" id="sidebar">
   <nav>
@@ -30,33 +30,21 @@
   </nav>
   <div class="sidebar-foot">YOUTUBE-2 · <span id="year"></span><br>Faqat ruxsat etilgan video manbalari.</div>
 </aside>
-<main class="main-content">
-  <section class="hero" id="hero"><div class="hero-content">
-    <div class="eyebrow"><span class="live-dot"></span>KINO OLAMIGA XUSH KELIBSIZ</div>
-    <h1>Har lahza —<br><span>yangi hikoya.</span></h1>
-    <p>Sevimli kinolaringizni bir joyda toping. Yangi filmlar, tarjima kinolar va seriallar.</p>
-    <button class="primary-button" id="browseButton">▶ KINOLARNI KO‘RISH</button>
-  </div><div class="hero-label">YOUTUBE-2 ORIGINAL</div></section>
+<main class="main-content tv-catalog">
   <section class="catalog-section">
-    <div class="section-heading"><div><div class="eyebrow">SIZ UCHUN TANLANDI</div><h2 id="sectionTitle">Barcha kinolar</h2></div><span class="result-count" id="resultCount"></span></div>
+    <div class="section-heading"><div><div class="eyebrow">YOUTUBE-2 KINO KATALOGI</div><h2 id="sectionTitle">Barcha kinolar</h2></div><span class="result-count" id="resultCount"></span></div>
     <div class="chips">
       <button class="chip selected" data-filter="Barchasi">Barchasi</button><button class="chip" data-filter="Trend">Trend</button><button class="chip" data-filter="Tarjima">Tarjima</button><button class="chip" data-filter="Serial">Seriallar</button>
     </div>
     <div class="movie-grid" id="movieGrid"></div>
     <div class="empty-state hidden" id="emptyState"><span>⌕</span><h3>Kino topilmadi</h3><p>Boshqa nom yoki janr bilan qidirib ko‘ring.</p></div>
   </section>
-  <footer>© <span id="footerYear"></span> YOUTUBE-2. Barcha huquqlar tegishli kontent egalariga tegishli.</footer>
+  <footer>© <span id="footerYear"></span> YOUTUBE-2</footer>
 </main>
-<dialog class="movie-dialog" id="movieDialog">
-  <button class="dialog-close" id="dialogClose" aria-label="Yopish">×</button><div class="dialog-poster" id="dialogPoster"></div>
-  <div class="dialog-body"><div class="eyebrow">YOUTUBE-2 KINO KATALOGI</div><h2 id="dialogTitle"></h2><div class="movie-meta" id="dialogMeta"></div><p id="dialogDescription"></p>
-    <div class="dialog-actions"><button class="primary-button" id="watchButton">▶ TOMOSHA QILISH</button><button class="secondary-button" id="favoriteButton">♡ Sevimlilarga</button></div><p class="source-note" id="sourceNote"></p>
-  </div>
-</dialog>
-<dialog class="player-dialog" id="playerDialog">
-  <div class="player-head"><h2 id="playerTitle">Video player</h2><button class="dialog-close inline-close" id="playerClose">×</button></div>
+
+<dialog class="player-dialog tv-player-dialog" id="playerDialog">
+  <div class="tv-player-top"><div class="player-brand"><span class="brand-mark">▶</span><span id="playerTitle">YOUTUBE-2</span></div><button class="tv-control" id="playerClose" aria-label="Orqaga qaytish">✕ <span>Orqaga</span></button></div>
   <div class="player-frame-wrap" id="playerFrameWrap"></div>
-  <p class="source-note">Faqat video egasi ruxsat bergan embed yoki to‘g‘ridan-to‘g‘ri video manbalaridan foydalaning.</p>
 </dialog>
 <dialog class="admin-dialog" id="adminDialog">
   <div class="admin-header"><div><div class="eyebrow">KATALOG BOSHQARUVI</div><h2>Admin panel</h2></div><button class="dialog-close inline-close" id="adminClose">×</button></div>

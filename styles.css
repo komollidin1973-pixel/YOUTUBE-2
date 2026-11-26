@@ -59,3 +59,24 @@
   #playerDialog .player-frame-wrap,
   #playerFrameWrap { min-height: 190px; }
 }
+
+/* Simplified Android TV catalogue and full-screen style player */
+.tv-catalog{padding-top:86px;min-height:calc(100vh - 66px)}
+.tv-catalog .catalog-section{padding-top:18px}
+.tv-catalog .movie-grid{grid-template-columns:repeat(6,minmax(0,1fr));gap:28px 20px}
+.tv-catalog .movie-card{outline:none;border-radius:12px;transition:transform .18s,box-shadow .18s}
+.tv-catalog .movie-card:focus,.tv-catalog .movie-card:focus-visible{outline:4px solid #fff;outline-offset:5px;transform:scale(1.035);box-shadow:0 0 0 8px #e62117}
+.tv-catalog .poster{border-radius:12px}
+.tv-catalog .movie-title{font-size:15px}
+.tv-player-dialog{width:min(96vw,1600px);max-width:1600px;padding:18px 22px;background:#080808;border:1px solid #333;border-radius:12px;max-height:96vh;overflow:hidden}
+.tv-player-dialog::backdrop{background:#000e}
+.tv-player-dialog .tv-player-top{margin-bottom:12px;min-height:44px}
+.tv-player-dialog .player-frame-wrap{width:100%;aspect-ratio:16/9;min-height:0;height:auto;border-radius:8px;background:#000}
+.tv-player-dialog #playerFrameWrap .youtube2-player,.tv-player-dialog #playerFrameWrap iframe,.tv-player-dialog #playerFrameWrap video{width:100%;height:100%;min-height:0}
+.tv-player-dialog .tv-control{min-height:44px}
+#brandSecret{touch-action:manipulation;user-select:none}
+#brandSecret:focus-visible{outline:2px solid #fff;outline-offset:5px;border-radius:5px}
+@media(max-width:1250px){.tv-catalog .movie-grid{grid-template-columns:repeat(5,minmax(0,1fr))}}
+@media(max-width:950px){.tv-catalog .movie-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:650px){.tv-catalog{padding:58px 14px 0}.tv-catalog .movie-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:18px 10px}.tv-player-dialog{width:100vw;max-width:none;height:100dvh;max-height:100dvh;border-radius:0;padding:10px}.tv-player-dialog .tv-player-top{margin-bottom:8px}}
+@media(min-width:1500px){.tv-catalog .movie-grid{grid-template-columns:repeat(7,minmax(0,1fr))}}
