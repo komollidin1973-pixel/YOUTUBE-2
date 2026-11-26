@@ -11,7 +11,7 @@ function toDb(m){return {title:m.title,year:m.year, type:m.type,genre:m.genre,la
 async function loadMovies(){ $("resultCount").textContent="Yuklanmoqda…";const {data,error}=await db.from("movies").select("*").eq("is_published",true).order("created_at",{ascending:false});if(error){console.error(error);toast("Katalogni yuklashda xatolik: "+error.message);movies=[];}else movies=(data||[]).map(fromDb);render();}
 function filteredMovies(){let a=[...movies];if(favoritesOnly)a=a.filter(m=>favorites.has(String(m.id)));else if(activeGenre)a=a.filter(m=>(m.genre||"").toLowerCase().includes(activeGenre.toLowerCase()));else if(activeCategory==="Trend")a=a.filter(m=>m.trending||m.featured);else if(activeCategory==="Tarjima")a=a.filter(m=>m.type==="Tarjima");else if(activeCategory==="Serial")a=a.filter(m=>m.type==="Serial");if(searchTerm)a=a.filter(m=>(m.title+" "+m.genre+" "+m.year).toLowerCase().includes(searchTerm));return a;}
 function posterMarkup(m){const u=safeHttpUrl(m.poster);return u?'<img loading="lazy" src="'+safeText(u)+'" alt="'+safeText(m.title)+'" onerror="this.remove()">':'<div class="poster-placeholder">▶</div>';}
-function previewSource(m){const candidate=safeHttpUrl(m.previewUrl)||safeHttpUrl(m.url);return /\\.(mp4|m3u8|webm)(?:$|[?#])/i.test(candidate)?candidate:"";}
+function previewSource(m){const candidate=safeHttpUrl(m.previewUrl)||safeHttpUrl(m.url);return /\.(mp4|m3u8|webm)(?:$|[?#])/i.test(candidate)?candidate:"";}
 function render(){stopAllPreviews();const list=filteredMovies();$("movieGrid").innerHTML=list.map(m=>'<article class="movie-card" data-id="'+safeText(m.id)+'" tabindex="0" role="button" aria-label="'+safeText(m.title)+'"><div class="poster">'+posterMarkup(m)+'<video class="card-preview" playsinline preload="none" aria-hidden="true"></video>'+(m.featured?'<span class="poster-badge">TAVSIYA</span>':'')+'<span class="poster-type">'+safeText(m.type)+'</span><span class="preview-hint">KO‘RIB CHIQISH</span></div><div class="movie-info"><div class="movie-title">'+safeText(m.title)+'</div><div class="movie-meta">'+safeText(m.year||"—")+' · '+safeText(m.genre||"Kino")+'</div></div></article>').join("");$("emptyState").classList.toggle("hidden",list.length!==0);$("resultCount").textContent=list.length+" ta kino";$("sectionTitle").textContent=favoritesOnly?"Sevimlilar":activeGenre||({Trend:"Trenddagi kinolar",Tarjima:"Tarjima kinolar",Serial:"Seriallar"}[activeCategory]||"Barcha kinolar");document.querySelectorAll(".chip").forEach(c=>c.classList.toggle("selected",c.dataset.filter===activeCategory&&!activeGenre&&!favoritesOnly));}
 
 // Poster ichidagi 12 soniyalik ovozli preview: fokus/hover kelganda, kino bosilmasdan ishga tushadi.
@@ -45,60 +45,68 @@ function startCardPreview(card) {
   const movie = movies.find(m => String(m.id) === String(card.dataset.id));
   if (!movie) return;
   const source = previewSource(movie);
-  if (!source) return; // Iframe manbalari brauzer xavfsizligi sabab poster ichida preview qilinmaydi.
+  if (!source) return;
   stopAllPreviews();
   const video = card.querySelector(".card-preview");
   if (!video) return;
+
   activePreviewCard = card;
   card.classList.add("preview-active");
-  // Preview audio is enabled. Browsers may still block audible autoplay until a remote/key interaction.
   video.muted = false;
   video.defaultMuted = false;
   video.volume = 0.65;
   video.playsInline = true;
   video.controls = false;
+  video.preload = "auto";
 
   const isSeparateClip = !!safeHttpUrl(movie.previewUrl);
   const startAt = isSeparateClip ? 0 : Math.max(0, Number(movie.previewStart ?? 2400));
-  let started = false;
-  const beginPlayback = () => {
-    if (started || activePreviewCard !== card) return;
-    started = true;
-    if (Number.isFinite(video.duration) && video.duration > 0 && startAt >= video.duration - 1) {
-      video.currentTime = 0;
-    } else if (startAt > 0) {
-      try { video.currentTime = startAt; } catch (_) {}
-    }
-    const playPromise = video.play();
-    if (playPromise && playPromise.then) {
-      playPromise.then(() => {
-        if (activePreviewCard !== card) return;
-        video.classList.add("is-playing");
-        previewStopTimer = setTimeout(() => stopPreview(card), PREVIEW_DURATION_SECONDS * 1000);
-      }).catch(() => stopPreview(card));
-    } else {
-      video.classList.add("is-playing");
+  let timerStarted = false;
+  const markPlaying = () => {
+    if (activePreviewCard !== card) return;
+    video.classList.add("is-playing");
+    if (!timerStarted) {
+      timerStarted = true;
       previewStopTimer = setTimeout(() => stopPreview(card), PREVIEW_DURATION_SECONDS * 1000);
     }
   };
+  video.addEventListener("loadedmetadata", () => {
+    if (activePreviewCard !== card) return;
+    if (startAt > 0 && Number.isFinite(video.duration) && startAt < video.duration - 1) {
+      try { video.currentTime = startAt; } catch (_) {}
+    }
+  }, {once:true});
+  video.addEventListener("ended", () => stopPreview(card), {once:true});
 
-  if (/\\.m3u8(?:$|[?#])/i.test(source) && !video.canPlayType("application/vnd.apple.mpegurl")) {
+  if (/\.m3u8(?:$|[?#])/i.test(source) && !video.canPlayType("application/vnd.apple.mpegurl")) {
     if (window.Hls && window.Hls.isSupported()) {
       activePreviewHls = new window.Hls({enableWorker:true});
       activePreviewHls.loadSource(source);
       activePreviewHls.attachMedia(video);
-      activePreviewHls.on(window.Hls.Events.MANIFEST_PARSED, beginPlayback);
+      activePreviewHls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+        const p = video.play();
+        if (p && p.then) p.then(markPlaying).catch(() => stopPreview(card));
+        else markPlaying();
+      });
       activePreviewHls.on(window.Hls.Events.ERROR, (_e, data) => { if (data.fatal) stopPreview(card); });
     } else stopPreview(card);
-  } else {
-    video.src = source;
-    video.addEventListener("loadedmetadata", beginPlayback, {once:true});
-    video.addEventListener("canplay", beginPlayback, {once:true});
-    video.addEventListener("ended", () => stopPreview(card), {once:true});
-    video.load();
+    return;
   }
-}
 
+  // MP4/WebM: call play immediately in the focus/pointer event chain,
+  // before waiting for loadedmetadata, so browser user-activation can apply.
+  video.src = source;
+  video.load();
+  const playPromise = video.play();
+  if (playPromise && playPromise.then) {
+    playPromise.then(markPlaying).catch(() => {
+      video.classList.remove("is-playing");
+      card.classList.remove("preview-active");
+      if (activePreviewCard === card) activePreviewCard = null;
+      console.info("Audible preview blocked by browser autoplay policy.");
+    });
+  } else markPlaying();
+}
 function showMovie(id){stopAllPreviews();const m=movies.find(x=>String(x.id)===String(id));if(!m)return;selectedMovie=m;openPlayer();}
 
 let activePlayerJS = null;
