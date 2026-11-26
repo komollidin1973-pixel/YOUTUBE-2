@@ -12,7 +12,34 @@ async function loadMovies(){ $("resultCount").textContent="Yuklanmoqda…";const
 function filteredMovies(){let a=[...movies];if(favoritesOnly)a=a.filter(m=>favorites.has(String(m.id)));else if(activeGenre)a=a.filter(m=>(m.genre||"").toLowerCase().includes(activeGenre.toLowerCase()));else if(activeCategory==="Trend")a=a.filter(m=>m.trending||m.featured);else if(activeCategory==="Tarjima")a=a.filter(m=>m.type==="Tarjima");else if(activeCategory==="Serial")a=a.filter(m=>m.type==="Serial");if(searchTerm)a=a.filter(m=>(m.title+" "+m.genre+" "+m.year).toLowerCase().includes(searchTerm));return a;}
 function posterMarkup(m){const u=safeHttpUrl(m.poster);return u?'<img loading="lazy" src="'+safeText(u)+'" alt="'+safeText(m.title)+'" onerror="this.remove()">':'<div class="poster-placeholder">▶</div>';}
 function previewSource(m){const candidate=safeHttpUrl(m.previewUrl)||safeHttpUrl(m.url);return /\.(mp4|m3u8|webm)(?:$|[?#])/i.test(candidate)?candidate:"";}
-function render(){stopAllPreviews();const list=filteredMovies();$("movieGrid").innerHTML=list.map(m=>'<article class="movie-card" data-id="'+safeText(m.id)+'" tabindex="0" role="button" aria-label="'+safeText(m.title)+'"><div class="poster">'+posterMarkup(m)+'<video class="card-preview" playsinline preload="none" aria-hidden="true"></video>'+(m.featured?'<span class="poster-badge">TAVSIYA</span>':'')+'<span class="poster-type">'+safeText(m.type)+'</span><span class="preview-hint">KO‘RIB CHIQISH</span></div><div class="movie-info"><div class="movie-title">'+safeText(m.title)+'</div><div class="movie-meta">'+safeText(m.year||"—")+' · '+safeText(m.genre||"Kino")+'</div></div></article>').join("");$("emptyState").classList.toggle("hidden",list.length!==0);$("resultCount").textContent=list.length+" ta kino";$("sectionTitle").textContent=favoritesOnly?"Sevimlilar":activeGenre||({Trend:"Trenddagi kinolar",Tarjima:"Tarjima kinolar",Serial:"Seriallar"}[activeCategory]||"Barcha kinolar");document.querySelectorAll(".chip").forEach(c=>c.classList.toggle("selected",c.dataset.filter===activeCategory&&!activeGenre&&!favoritesOnly));}
+function render(){
+  stopAllPreviews();
+  const base = filteredMovies();
+  const homeView = !favoritesOnly && !activeGenre && activeCategory === "Barchasi" && !searchTerm;
+  const sections = homeView ? [
+    {title:"Trenddagi kinolar", items:base.filter(m=>m.trending||m.featured)},
+    {title:"Rus tilida kinolar", items:base.filter(m=>/рус|rus/i.test(m.language||""))},
+    {title:"Qo‘rqinchli kinolar", items:base.filter(m=>/dahshat|qo‘rq|qorq|horror|ужас/i.test((m.genre||"")+" "+(m.type||"")))},
+    {title:"Jangari kinolar", items:base.filter(m=>/jangari|action|бой|боевик/i.test((m.genre||"")+" "+(m.type||"")))},
+    {title:"Komediya kinolar", items:base.filter(m=>/komediya|comedy|комеди/i.test((m.genre||"")+" "+(m.type||"")))},
+    {title:"Tarjima kinolar", items:base.filter(m=>m.type==="Tarjima"||/tarjima/i.test(m.type||""))},
+    {title:"Seriallar", items:base.filter(m=>m.type==="Serial"||/serial/i.test(m.type||""))},
+    {title:"Yangi qo‘shilgan kinolar", items:base}
+  ].filter(section=>section.items.length) : [
+    {title:favoritesOnly?"Sevimlilar":activeGenre||({Trend:"Trenddagi kinolar",Tarjima:"Tarjima kinolar",Serial:"Seriallar"}[activeCategory]||"Kinolar"),items:base}
+  ];
+
+  const cardHTML = m => '<article class="movie-card" data-id="'+safeText(m.id)+'" tabindex="0" role="button" aria-label="'+safeText(m.title)+'"><div class="poster">'+posterMarkup(m)+'<video class="card-preview" playsinline preload="none" aria-hidden="true"></video>'+(m.featured?'<span class="poster-badge">TAVSIYA</span>':'')+'<span class="poster-type">'+safeText(m.type)+'</span><span class="preview-hint">KO‘RIB CHIQISH</span></div><div class="movie-info"><div class="movie-title">'+safeText(m.title)+'</div><div class="movie-meta">'+safeText(m.year||"—")+' · '+safeText(m.genre||"Kino")+'</div></div></article>';
+
+  $("movieGrid").innerHTML = sections.map((section,index)=>
+    '<section class="catalog-row" data-row="'+index+'"><div class="catalog-row-heading"><h2>'+safeText(section.title)+'</h2><span>'+section.items.length+' ta</span></div><div class="movie-row-track">'+section.items.map(cardHTML).join("")+'</div></section>'
+  ).join("");
+
+  $("emptyState").classList.toggle("hidden",base.length!==0);
+  $("resultCount").textContent=base.length+" ta kino";
+  if($("sectionTitle")) $("sectionTitle").textContent=favoritesOnly?"Sevimlilar":activeGenre||({Trend:"Trenddagi kinolar",Tarjima:"Tarjima kinolar",Serial:"Seriallar"}[activeCategory]||"Barcha kinolar");
+  document.querySelectorAll(".chip").forEach(c=>c.classList.toggle("selected",c.dataset.filter===activeCategory&&!activeGenre&&!favoritesOnly));
+}
 
 // Poster preview: autoplay boshlanishida brauzer siyosati sabab ovozsiz; foydalanuvchi pult/sichqoncha bilan harakat qilgach ovoz yoqiladi.
 const PREVIEW_DURATION_SECONDS = 12;
@@ -270,13 +297,37 @@ $("menuToggle").addEventListener("click",()=>$("sidebar").classList.toggle("open
 db.auth.onAuthStateChange((_event,session)=>{adminUser=session?.user||null;if($("adminDialog").open)updateAdminView();});
 loadMovies();
 
-// Android TV remote navigation: arrows move focus, OK selects, BACK closes player.
-function visibleFocusable(){
-  return [...document.querySelectorAll('button:not([disabled]), input:not([disabled]), .movie-card[tabindex="0"]')]
-    .filter(el=>!el.closest('.hidden') && el.getClientRects().length);
-}
-function focusMovieCard(index){
-  const cards=[...document.querySelectorAll('.movie-card[tabindex="0"]')];
+
+/* YOUTUBE-2 horizontal category shelves */
+(function(){
+  if(document.getElementById("youtube2-horizontal-rows-style")) return;
+  const style=document.createElement("style");
+  style.id="youtube2-horizontal-rows-style";
+  style.textContent=`
+    #movieGrid{display:flex!important;flex-direction:column!important;gap:30px!important;width:100%}
+    .catalog-row{display:block;width:100%;min-width:0}
+    .catalog-row-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 13px}
+    .catalog-row-heading h2{margin:0;font-size:clamp(19px,1.7vw,27px);font-weight:700;color:#f4f4f4}
+    .catalog-row-heading span{font-size:13px;color:#999;white-space:nowrap}
+    .movie-row-track{display:flex;flex-direction:row;gap:20px;overflow-x:auto;overflow-y:hidden;padding:3px 4px 12px;scroll-behavior:smooth;scroll-snap-type:x mandatory;overscroll-behavior-x:contain;scrollbar-width:thin}
+    .movie-row-track .movie-card{flex:0 0 clamp(220px,22vw,330px);width:clamp(220px,22vw,330px);min-width:0;scroll-snap-align:start}
+    .movie-row-track .poster{width:100%;aspect-ratio:16/9;overflow:hidden}
+    .movie-row-track .poster img,.movie-row-track .card-preview{width:100%;height:100%;object-fit:cover}
+    .movie-row-track .movie-card:focus{outline:3px solid #f22;outline-offset:4px;transform:scale(1.025);z-index:2}
+    .movie-row-track .movie-info{padding:8px 2px 3px}
+    .movie-row-track::-webkit-scrollbar{height:6px}
+    .movie-row-track::-webkit-scrollbar-thumb{background:#555;border-radius:8px}
+    @media(max-width:700px){.movie-row-track .movie-card{flex-basis:72vw;width:72vw}}
+  `;
+  document.head.append(style);
+})();
+
+// Android TV remote: left/right move along a row; up/down switch rows.
+function focusMovieCard(index, rowIndex = 0){
+  const rows=[...document.querySelectorAll('.movie-row-track')];
+  if(!rows.length)return;
+  const row=rows[Math.max(0,Math.min(rowIndex,rows.length-1))];
+  const cards=[...row.querySelectorAll('.movie-card')];
   if(!cards.length)return;
   const target=cards[Math.max(0,Math.min(index,cards.length-1))];
   target.focus({preventScroll:false});
@@ -285,25 +336,30 @@ document.addEventListener("keydown",e=>{
   if((e.key==="Escape"||e.key==="Backspace")&&$("playerDialog").open){e.preventDefault();closePlayer();return;}
   if($("playerDialog").open)return;
   const current=document.activeElement;
-  const cards=[...document.querySelectorAll('.movie-card[tabindex="0"]')];
-  if(cards.includes(current)&&["ArrowRight","ArrowLeft","ArrowDown","ArrowUp"].includes(e.key)){
+  const row=current?.closest?.('.movie-row-track');
+  if(row && current.matches('.movie-card') && ["ArrowRight","ArrowLeft","ArrowDown","ArrowUp"].includes(e.key)){
     e.preventDefault();
-    const cols=Math.max(1,Math.round($('movieGrid').getBoundingClientRect().width/(cards[0].getBoundingClientRect().width+20)));
-    const i=cards.indexOf(current);
-    if(e.key==="ArrowRight")focusMovieCard(i+1);
-    if(e.key==="ArrowLeft")focusMovieCard(i-1);
-    if(e.key==="ArrowDown")focusMovieCard(i+cols);
-    if(e.key==="ArrowUp"){if(i-cols>=0)focusMovieCard(i-cols);else $('searchInput').focus();}
+    const rows=[...document.querySelectorAll('.movie-row-track')];
+    const rowIndex=rows.indexOf(row);
+    const cards=[...row.querySelectorAll('.movie-card')];
+    const index=cards.indexOf(current);
+    if(e.key==="ArrowRight")focusMovieCard(index+1,rowIndex);
+    if(e.key==="ArrowLeft")focusMovieCard(index-1,rowIndex);
+    if(e.key==="ArrowDown")focusMovieCard(index,rowIndex+1);
+    if(e.key==="ArrowUp"){
+      if(rowIndex>0)focusMovieCard(index,rowIndex-1);
+      else $("searchInput")?.focus();
+    }
     return;
   }
-  if((e.key==="ArrowDown"||e.key==="ArrowUp") && (current===$('searchInput')||current===document.body)){
-    if(cards.length){e.preventDefault();focusMovieCard(0);}
+  if((e.key==="ArrowDown"||e.key==="ArrowUp") && (current===$("searchInput")||current===document.body)){
+    const first=document.querySelector('.movie-row-track .movie-card');
+    if(first){e.preventDefault();first.focus({preventScroll:false});}
   }
 });
 // Put initial focus on the first movie when the catalogue has loaded.
 const movieFocusObserver=new MutationObserver(()=>{
-  if(document.querySelector('.movie-card[tabindex="0"]') && !document.activeElement.closest?.('input,button,.movie-card')){
-    document.querySelector('.movie-card[tabindex="0"]').focus({preventScroll:true});
-  }
+  const first=document.querySelector('.movie-row-track .movie-card');
+  if(first && !document.activeElement?.closest?.('input,button,.movie-card')) first.focus({preventScroll:true});
 });
-movieFocusObserver.observe($('movieGrid'),{childList:true});
+movieFocusObserver.observe($('movieGrid'),{childList:true,subtree:true});
