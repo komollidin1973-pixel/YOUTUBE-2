@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#0f0f0f">
   <title>YOUTUBE-2 — Kino olami</title>
-  <link rel="stylesheet" href="styles.css?v=20261126-ytwide2">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <header class="topbar">
@@ -66,6 +66,8 @@
       <label>Poster URL<input id="moviePoster" type="url" placeholder="https://.../poster.jpg"></label>
       <label>Tavsif<textarea id="movieDescription" rows="3" placeholder="Kino haqida qisqacha..."></textarea></label>
       <label>Video yoki ruxsat etilgan embed URL<input id="movieUrl" type="url" placeholder="https://..."></label>
+      <label>Poster ichidagi qisqa preview URL (ixtiyoriy, MP4 tavsiya)<input id="moviePreviewUrl" type="url" placeholder="Bo‘sh qolsa asosiy videodan foydalanadi"></label>
+      <div class="form-row"><label>Preview boshlanishi (daqiqada)<input id="moviePreviewStart" type="number" min="0" max="10000" value="40"></label><label>Preview davomiyligi<input type="text" value="12 soniya (avtomatik)" disabled></label></div>
       <label class="check-label"><input id="movieFeatured" type="checkbox"> Bosh sahifada tavsiya qilish</label>
       <label class="check-label"><input id="moviePublished" type="checkbox" checked> Katalogda hammaga ko‘rsatish</label>
       <div class="form-actions"><button type="button" class="secondary-button" id="resetForm">Tozalash</button><button class="primary-button">Saqlash</button></div>
@@ -79,7 +81,8 @@
   window.YOUTUBE2_SUPABASE_URL = "https://wfipitfzczkighgsqntn.supabase.co";
   window.YOUTUBE2_SUPABASE_KEY = "sb_publishable_wZ-0jGIcVQ7ryZ-edLHlVA_pFhPXUCJ";
 </script>
-<script src="playerjs.js?v=20261126-ytwide2"></script>
-<script src="app.js?v=20261126-ytwide2"></script>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.18/dist/hls.min.js"></script>
+<script src="playerjs.js"></script>
+<script src="app.js"></script>
 </body></html>
 

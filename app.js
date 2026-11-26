@@ -6,13 +6,100 @@ const $ = id => document.getElementById(id);
 function safeText(v){return String(v??"").replace(/[&<>\"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function safeHttpUrl(v){try{const u=new URL(v);return ["https:","http:"].includes(u.protocol)?u.href:"";}catch{return "";}}
 function toast(msg){$("toast").textContent=msg;$("toast").classList.remove("hidden");setTimeout(()=>$("toast").classList.add("hidden"),3500);}
-function fromDb(row){return {id:row.id,title:row.title,year:row.year,type:row.type||"Film",genre:row.genre||"",language:row.language||"",description:row.description||"",poster:row.poster_url||"",url:row.video_url||"",featured:!!row.featured,trending:!!row.trending,is_published:!!row.is_published};}
-function toDb(m){return {title:m.title,year:m.year, type:m.type,genre:m.genre,language:m.language,description:m.description,poster_url:m.poster,video_url:m.url,featured:m.featured,is_published:m.is_published};}
+function fromDb(row){return {id:row.id,title:row.title,year:row.year,type:row.type||"Film",genre:row.genre||"",language:row.language||"",description:row.description||"",poster:row.poster_url||"",url:row.video_url||"",previewUrl:row.preview_url||"",previewStart:Number(row.preview_start_seconds??2400),featured:!!row.featured,trending:!!row.trending,is_published:!!row.is_published};}
+function toDb(m){return {title:m.title,year:m.year, type:m.type,genre:m.genre,language:m.language,description:m.description,poster_url:m.poster,video_url:m.url,preview_url:m.previewUrl||null,preview_start_seconds:Number(m.previewStart)||2400,featured:m.featured,is_published:m.is_published};}
 async function loadMovies(){ $("resultCount").textContent="Yuklanmoqda…";const {data,error}=await db.from("movies").select("*").eq("is_published",true).order("created_at",{ascending:false});if(error){console.error(error);toast("Katalogni yuklashda xatolik: "+error.message);movies=[];}else movies=(data||[]).map(fromDb);render();}
 function filteredMovies(){let a=[...movies];if(favoritesOnly)a=a.filter(m=>favorites.has(String(m.id)));else if(activeGenre)a=a.filter(m=>(m.genre||"").toLowerCase().includes(activeGenre.toLowerCase()));else if(activeCategory==="Trend")a=a.filter(m=>m.trending||m.featured);else if(activeCategory==="Tarjima")a=a.filter(m=>m.type==="Tarjima");else if(activeCategory==="Serial")a=a.filter(m=>m.type==="Serial");if(searchTerm)a=a.filter(m=>(m.title+" "+m.genre+" "+m.year).toLowerCase().includes(searchTerm));return a;}
 function posterMarkup(m){const u=safeHttpUrl(m.poster);return u?'<img loading="lazy" src="'+safeText(u)+'" alt="'+safeText(m.title)+'" onerror="this.remove()">':'<div class="poster-placeholder">▶</div>';}
-function render(){const list=filteredMovies();$("movieGrid").innerHTML=list.map(m=>'<article class="movie-card" data-id="'+safeText(m.id)+'" tabindex="0" role="button"><div class="poster">'+posterMarkup(m)+(m.featured?'<span class="poster-badge">TAVSIYA</span>':'')+'<span class="poster-type">'+safeText(m.type)+'</span></div><div class="movie-info"><div class="movie-title">'+safeText(m.title)+'</div><div class="movie-meta">'+safeText(m.year||"—")+' · '+safeText(m.genre||"Kino")+'</div></div></article>').join("");$("emptyState").classList.toggle("hidden",list.length!==0);$("resultCount").textContent=list.length+" ta kino";$("sectionTitle").textContent=favoritesOnly?"Sevimlilar":activeGenre||({Trend:"Trenddagi kinolar",Tarjima:"Tarjima kinolar",Serial:"Seriallar"}[activeCategory]||"Barcha kinolar");document.querySelectorAll(".chip").forEach(c=>c.classList.toggle("selected",c.dataset.filter===activeCategory&&!activeGenre&&!favoritesOnly));}
-function showMovie(id){const m=movies.find(x=>String(x.id)===String(id));if(!m)return;selectedMovie=m;openPlayer();}
+function previewSource(m){const candidate=safeHttpUrl(m.previewUrl)||safeHttpUrl(m.url);return /\\.(mp4|m3u8|webm)(?:$|[?#])/i.test(candidate)?candidate:"";}
+function render(){stopAllPreviews();const list=filteredMovies();$("movieGrid").innerHTML=list.map(m=>'<article class="movie-card" data-id="'+safeText(m.id)+'" tabindex="0" role="button" aria-label="'+safeText(m.title)+'"><div class="poster">'+posterMarkup(m)+'<video class="card-preview" playsinline preload="none" aria-hidden="true"></video>'+(m.featured?'<span class="poster-badge">TAVSIYA</span>':'')+'<span class="poster-type">'+safeText(m.type)+'</span><span class="preview-hint">KO‘RIB CHIQISH</span></div><div class="movie-info"><div class="movie-title">'+safeText(m.title)+'</div><div class="movie-meta">'+safeText(m.year||"—")+' · '+safeText(m.genre||"Kino")+'</div></div></article>').join("");$("emptyState").classList.toggle("hidden",list.length!==0);$("resultCount").textContent=list.length+" ta kino";$("sectionTitle").textContent=favoritesOnly?"Sevimlilar":activeGenre||({Trend:"Trenddagi kinolar",Tarjima:"Tarjima kinolar",Serial:"Seriallar"}[activeCategory]||"Barcha kinolar");document.querySelectorAll(".chip").forEach(c=>c.classList.toggle("selected",c.dataset.filter===activeCategory&&!activeGenre&&!favoritesOnly));}
+
+// Poster ichidagi 12 soniyalik ovozli preview: fokus/hover kelganda, kino bosilmasdan ishga tushadi.
+const PREVIEW_DURATION_SECONDS = 12;
+let activePreviewCard = null;
+let activePreviewHls = null;
+let previewStopTimer = null;
+
+function stopPreview(card = activePreviewCard) {
+  if (!card) return;
+  const video = card.querySelector(".card-preview");
+  if (previewStopTimer) clearTimeout(previewStopTimer);
+  previewStopTimer = null;
+  if (video) {
+    try { video.pause(); video.removeAttribute("src"); video.load(); } catch (_) {}
+    video.classList.remove("is-playing");
+    video.onloadedmetadata = null;
+    video.oncanplay = null;
+    video.ontimeupdate = null;
+  }
+  if (activePreviewHls) { try { activePreviewHls.destroy(); } catch (_) {} }
+  activePreviewHls = null;
+  card.classList.remove("preview-active");
+  if (activePreviewCard === card) activePreviewCard = null;
+}
+function stopAllPreviews() {
+  if (activePreviewCard) stopPreview(activePreviewCard);
+}
+function startCardPreview(card) {
+  if (!card || $("playerDialog").open || card.classList.contains("preview-active")) return;
+  const movie = movies.find(m => String(m.id) === String(card.dataset.id));
+  if (!movie) return;
+  const source = previewSource(movie);
+  if (!source) return; // Iframe manbalari brauzer xavfsizligi sabab poster ichida preview qilinmaydi.
+  stopAllPreviews();
+  const video = card.querySelector(".card-preview");
+  if (!video) return;
+  activePreviewCard = card;
+  card.classList.add("preview-active");
+  // Preview audio is enabled. Browsers may still block audible autoplay until a remote/key interaction.
+  video.muted = false;
+  video.defaultMuted = false;
+  video.volume = 0.65;
+  video.playsInline = true;
+  video.controls = false;
+
+  const isSeparateClip = !!safeHttpUrl(movie.previewUrl);
+  const startAt = isSeparateClip ? 0 : Math.max(0, Number(movie.previewStart ?? 2400));
+  let started = false;
+  const beginPlayback = () => {
+    if (started || activePreviewCard !== card) return;
+    started = true;
+    if (Number.isFinite(video.duration) && video.duration > 0 && startAt >= video.duration - 1) {
+      video.currentTime = 0;
+    } else if (startAt > 0) {
+      try { video.currentTime = startAt; } catch (_) {}
+    }
+    const playPromise = video.play();
+    if (playPromise && playPromise.then) {
+      playPromise.then(() => {
+        if (activePreviewCard !== card) return;
+        video.classList.add("is-playing");
+        previewStopTimer = setTimeout(() => stopPreview(card), PREVIEW_DURATION_SECONDS * 1000);
+      }).catch(() => stopPreview(card));
+    } else {
+      video.classList.add("is-playing");
+      previewStopTimer = setTimeout(() => stopPreview(card), PREVIEW_DURATION_SECONDS * 1000);
+    }
+  };
+
+  if (/\\.m3u8(?:$|[?#])/i.test(source) && !video.canPlayType("application/vnd.apple.mpegurl")) {
+    if (window.Hls && window.Hls.isSupported()) {
+      activePreviewHls = new window.Hls({enableWorker:true});
+      activePreviewHls.loadSource(source);
+      activePreviewHls.attachMedia(video);
+      activePreviewHls.on(window.Hls.Events.MANIFEST_PARSED, beginPlayback);
+      activePreviewHls.on(window.Hls.Events.ERROR, (_e, data) => { if (data.fatal) stopPreview(card); });
+    } else stopPreview(card);
+  } else {
+    video.src = source;
+    video.addEventListener("loadedmetadata", beginPlayback, {once:true});
+    video.addEventListener("canplay", beginPlayback, {once:true});
+    video.addEventListener("ended", () => stopPreview(card), {once:true});
+    video.load();
+  }
+}
+
+function showMovie(id){stopAllPreviews();const m=movies.find(x=>String(x.id)===String(id));if(!m)return;selectedMovie=m;openPlayer();}
 
 let activePlayerJS = null;
 
@@ -111,11 +198,15 @@ function closePlayer() {
   }
 }
 
-function clearForm(){$("movieForm").reset();$("movieId").value="";$("movieLanguage").value="O‘zbek tilida";$("moviePublished").checked=true;}
+function clearForm(){$("movieForm").reset();$("movieId").value="";$("movieLanguage").value="O‘zbek tilida";$("moviePreviewStart").value="40";$("moviePublished").checked=true;}
 async function refreshAdmin(){const {data,error}=await db.from("movies").select("*").order("created_at",{ascending:false});if(error){toast("Admin katalogini yuklab bo‘lmadi: "+error.message);return;}const all=(data||[]).map(fromDb);$("adminCount").textContent=all.length+" ta";$("adminMovieList").innerHTML=all.map(m=>'<div class="admin-row"><div class="mini-poster"></div><div class="admin-row-title">'+safeText(m.title)+'<div class="movie-meta">'+safeText(m.year||"")+' · '+safeText(m.type)+' · '+(m.is_published?"Ommaviy":"Yashirin")+'</div></div><div class="admin-row-actions"><button data-edit="'+safeText(m.id)+'">Tahrir</button><button class="delete" data-delete="'+safeText(m.id)+'">O‘chir</button></div></div>').join("");}
 function updateAdminView(){const logged=!!adminUser;$("adminLoginSection").classList.toggle("hidden",logged);$("adminTools").classList.toggle("hidden",!logged);if(logged){$("adminIdentity").textContent=adminUser.email||"Admin";refreshAdmin();}}
-async function editMovie(id){const {data,error}=await db.from("movies").select("*").eq("id",id).single();if(error){toast(error.message);return;}const m=fromDb(data);$("movieId").value=m.id;$("movieTitle").value=m.title;$("movieYear").value=m.year||"";$("movieType").value=m.type||"Film";$("movieGenre").value=m.genre;$("movieLanguage").value=m.language;$("moviePoster").value=m.poster;$("movieDescription").value=m.description;$("movieUrl").value=m.url;$("movieFeatured").checked=m.featured;$("moviePublished").checked=m.is_published;$("movieTitle").focus();}
+async function editMovie(id){const {data,error}=await db.from("movies").select("*").eq("id",id).single();if(error){toast(error.message);return;}const m=fromDb(data);$("movieId").value=m.id;$("movieTitle").value=m.title;$("movieYear").value=m.year||"";$("movieType").value=m.type||"Film";$("movieGenre").value=m.genre;$("movieLanguage").value=m.language;$("moviePoster").value=m.poster;$("movieDescription").value=m.description;$("movieUrl").value=m.url;$("moviePreviewUrl").value=m.previewUrl||"";$("moviePreviewStart").value=Math.round((m.previewStart||2400)/60);$("movieFeatured").checked=m.featured;$("moviePublished").checked=m.is_published;$("movieTitle").focus();}
 $("year").textContent=new Date().getFullYear();$("footerYear").textContent=new Date().getFullYear();
+$("movieGrid").addEventListener("pointerover",e=>{const c=e.target.closest(".movie-card");if(c && !c.contains(e.relatedTarget))startCardPreview(c);});
+$("movieGrid").addEventListener("pointerout",e=>{const c=e.target.closest(".movie-card");if(c && !c.contains(e.relatedTarget))stopPreview(c);});
+$("movieGrid").addEventListener("focusin",e=>{const c=e.target.closest(".movie-card");if(c)startCardPreview(c);});
+$("movieGrid").addEventListener("focusout",e=>{const c=e.target.closest(".movie-card");if(c && !c.contains(e.relatedTarget))stopPreview(c);});
 $("movieGrid").addEventListener("click",e=>{const c=e.target.closest("[data-id]");if(c)showMovie(c.dataset.id);});
 $("movieGrid").addEventListener("keydown",e=>{if((e.key==="Enter"||e.key===" ")&&e.target.matches("[data-id]")){e.preventDefault();showMovie(e.target.dataset.id);}});
 $("searchInput").addEventListener("input",e=>{searchTerm=e.target.value.trim().toLowerCase();render();});$("searchForm").addEventListener("submit",e=>{e.preventDefault();render();});
@@ -135,7 +226,7 @@ brandSecret.addEventListener("pointerdown",()=>{logoHoldTimer=setTimeout(openHid
 $("adminClose").addEventListener("click",()=>$("adminDialog").close());$("resetForm").addEventListener("click",clearForm);
 $("loginForm").addEventListener("submit",async e=>{e.preventDefault();const {data,error}=await db.auth.signInWithPassword({email:$("adminEmail").value.trim(),password:$("adminPassword").value});if(error){toast("Kirish amalga oshmadi: "+error.message);return;}adminUser=data.user;updateAdminView();toast("Admin sifatida kirdingiz.");});
 $("logoutButton").addEventListener("click",async()=>{await db.auth.signOut();adminUser=null;updateAdminView();clearForm();toast("Tizimdan chiqdingiz.");});
-$("movieForm").addEventListener("submit",async e=>{e.preventDefault();if(!adminUser){toast("Avval admin sifatida kiring.");return;}const id=$("movieId").value;const m={title:$("movieTitle").value.trim(),year:Number($("movieYear").value)||null,type:$("movieType").value,genre:$("movieGenre").value.trim(),language:$("movieLanguage").value.trim(),poster:safeHttpUrl($("moviePoster").value),description:$("movieDescription").value.trim(),url:safeHttpUrl($("movieUrl").value),featured:$("movieFeatured").checked,is_published:$("moviePublished").checked};if(!m.title){toast("Kino nomini kiriting.");return;}const query=id?db.from("movies").update(toDb(m)).eq("id",id):db.from("movies").insert(toDb(m));const {error}=await query;if(error){toast("Saqlashda xatolik: "+error.message);return;}clearForm();await loadMovies();await refreshAdmin();toast("Kino bazaga saqlandi.");});
+$("movieForm").addEventListener("submit",async e=>{e.preventDefault();if(!adminUser){toast("Avval admin sifatida kiring.");return;}const id=$("movieId").value;const m={title:$("movieTitle").value.trim(),year:Number($("movieYear").value)||null,type:$("movieType").value,genre:$("movieGenre").value.trim(),language:$("movieLanguage").value.trim(),poster:safeHttpUrl($("moviePoster").value),description:$("movieDescription").value.trim(),url:safeHttpUrl($("movieUrl").value),previewUrl:safeHttpUrl($("moviePreviewUrl").value),previewStart:Math.max(0,Number($("moviePreviewStart").value||40)*60),featured:$("movieFeatured").checked,is_published:$("moviePublished").checked};if(!m.title){toast("Kino nomini kiriting.");return;}const query=id?db.from("movies").update(toDb(m)).eq("id",id):db.from("movies").insert(toDb(m));const {error}=await query;if(error){toast("Saqlashda xatolik: "+error.message);return;}clearForm();await loadMovies();await refreshAdmin();toast("Kino bazaga saqlandi.");});
 $("adminMovieList").addEventListener("click",async e=>{const edit=e.target.closest("[data-edit]"),del=e.target.closest("[data-delete]");if(edit)await editMovie(edit.dataset.edit);if(del){const id=del.dataset.delete;if(confirm("Bu kino o‘chirilsinmi?")){const {error}=await db.from("movies").delete().eq("id",id);if(error)toast("O‘chirishda xatolik: "+error.message);else{await loadMovies();await refreshAdmin();toast("Kino o‘chirildi.");}}}});
 $("menuToggle").addEventListener("click",()=>$("sidebar").classList.toggle("open"));
 db.auth.onAuthStateChange((_event,session)=>{adminUser=session?.user||null;if($("adminDialog").open)updateAdminView();});
