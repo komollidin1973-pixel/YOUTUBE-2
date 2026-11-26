@@ -14,11 +14,12 @@ function posterMarkup(m){const u=safeHttpUrl(m.poster);return u?'<img loading="l
 function previewSource(m){const candidate=safeHttpUrl(m.previewUrl)||safeHttpUrl(m.url);return /\.(mp4|m3u8|webm)(?:$|[?#])/i.test(candidate)?candidate:"";}
 function render(){stopAllPreviews();const list=filteredMovies();$("movieGrid").innerHTML=list.map(m=>'<article class="movie-card" data-id="'+safeText(m.id)+'" tabindex="0" role="button" aria-label="'+safeText(m.title)+'"><div class="poster">'+posterMarkup(m)+'<video class="card-preview" playsinline preload="none" aria-hidden="true"></video>'+(m.featured?'<span class="poster-badge">TAVSIYA</span>':'')+'<span class="poster-type">'+safeText(m.type)+'</span><span class="preview-hint">KO‘RIB CHIQISH</span></div><div class="movie-info"><div class="movie-title">'+safeText(m.title)+'</div><div class="movie-meta">'+safeText(m.year||"—")+' · '+safeText(m.genre||"Kino")+'</div></div></article>').join("");$("emptyState").classList.toggle("hidden",list.length!==0);$("resultCount").textContent=list.length+" ta kino";$("sectionTitle").textContent=favoritesOnly?"Sevimlilar":activeGenre||({Trend:"Trenddagi kinolar",Tarjima:"Tarjima kinolar",Serial:"Seriallar"}[activeCategory]||"Barcha kinolar");document.querySelectorAll(".chip").forEach(c=>c.classList.toggle("selected",c.dataset.filter===activeCategory&&!activeGenre&&!favoritesOnly));}
 
-// Poster ichidagi 12 soniyalik ovozli preview: fokus/hover kelganda, kino bosilmasdan ishga tushadi.
+// Poster preview: autoplay boshlanishida brauzer siyosati sabab ovozsiz; foydalanuvchi pult/sichqoncha bilan harakat qilgach ovoz yoqiladi.
 const PREVIEW_DURATION_SECONDS = 12;
 let activePreviewCard = null;
 let activePreviewHls = null;
 let previewStopTimer = null;
+let previewUserGesture = false;
 
 function stopPreview(card = activePreviewCard) {
   if (!card) return;
@@ -29,17 +30,14 @@ function stopPreview(card = activePreviewCard) {
     try { video.pause(); video.removeAttribute("src"); video.load(); } catch (_) {}
     video.classList.remove("is-playing");
     video.onloadedmetadata = null;
-    video.oncanplay = null;
-    video.ontimeupdate = null;
+    video.onerror = null;
   }
   if (activePreviewHls) { try { activePreviewHls.destroy(); } catch (_) {} }
   activePreviewHls = null;
   card.classList.remove("preview-active");
   if (activePreviewCard === card) activePreviewCard = null;
 }
-function stopAllPreviews() {
-  if (activePreviewCard) stopPreview(activePreviewCard);
-}
+function stopAllPreviews() { if (activePreviewCard) stopPreview(activePreviewCard); }
 function startCardPreview(card) {
   if (!card || $("playerDialog").open || card.classList.contains("preview-active")) return;
   const movie = movies.find(m => String(m.id) === String(card.dataset.id));
@@ -52,8 +50,9 @@ function startCardPreview(card) {
 
   activePreviewCard = card;
   card.classList.add("preview-active");
-  video.muted = false;
-  video.defaultMuted = false;
+  // Muted autoplay is permitted by Chrome/Android WebView. Audio is enabled on a real remote/key gesture below.
+  video.muted = !previewUserGesture;
+  video.defaultMuted = !previewUserGesture;
   video.volume = 0.65;
   video.playsInline = true;
   video.controls = false;
@@ -70,6 +69,11 @@ function startCardPreview(card) {
       previewStopTimer = setTimeout(() => stopPreview(card), PREVIEW_DURATION_SECONDS * 1000);
     }
   };
+  video.onerror = () => {
+    console.warn("YOUTUBE-2 preview video error", video.error?.code, source);
+    card.classList.remove("preview-active");
+    if (activePreviewCard === card) activePreviewCard = null;
+  };
   video.addEventListener("loadedmetadata", () => {
     if (activePreviewCard !== card) return;
     if (startAt > 0 && Number.isFinite(video.duration) && startAt < video.duration - 1) {
@@ -85,7 +89,7 @@ function startCardPreview(card) {
       activePreviewHls.attachMedia(video);
       activePreviewHls.on(window.Hls.Events.MANIFEST_PARSED, () => {
         const p = video.play();
-        if (p && p.then) p.then(markPlaying).catch(() => stopPreview(card));
+        if (p && p.then) p.then(markPlaying).catch(err => { console.warn("Preview autoplay blocked", err); stopPreview(card); });
         else markPlaying();
       });
       activePreviewHls.on(window.Hls.Events.ERROR, (_e, data) => { if (data.fatal) stopPreview(card); });
@@ -93,20 +97,46 @@ function startCardPreview(card) {
     return;
   }
 
-  // MP4/WebM: call play immediately in the focus/pointer event chain,
-  // before waiting for loadedmetadata, so browser user-activation can apply.
   video.src = source;
   video.load();
   const playPromise = video.play();
   if (playPromise && playPromise.then) {
-    playPromise.then(markPlaying).catch(() => {
-      video.classList.remove("is-playing");
+    playPromise.then(markPlaying).catch(err => {
+      console.warn("Preview play failed", err, source);
       card.classList.remove("preview-active");
       if (activePreviewCard === card) activePreviewCard = null;
-      console.info("Audible preview blocked by browser autoplay policy.");
     });
   } else markPlaying();
 }
+
+// Arrow/OK/Enter from an Android TV remote is a user gesture. Enable sound on the newly focused preview.
+document.addEventListener("keydown", e => {
+  if (!["ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown", "Enter", " "].includes(e.key)) return;
+  previewUserGesture = true;
+  const focusedCard = document.activeElement?.closest?.(".movie-card");
+  if (focusedCard) {
+    const v = focusedCard.querySelector(".card-preview");
+    if (v && activePreviewCard === focusedCard) {
+      v.muted = false;
+      v.defaultMuted = false;
+      v.volume = 0.65;
+      const p = v.play();
+      if (p?.catch) p.catch(err => console.info("Audible preview still blocked by WebView policy", err));
+    }
+  }
+}, true);
+// Mouse/touch interaction also unlocks audio where the browser allows it.
+document.addEventListener("pointerdown", e => {
+  const card = e.target.closest?.(".movie-card");
+  if (!card) return;
+  previewUserGesture = true;
+  const v = card.querySelector(".card-preview");
+  if (v && activePreviewCard === card) {
+    v.muted = false; v.defaultMuted = false; v.volume = 0.65;
+    const p = v.play(); if (p?.catch) p.catch(() => {});
+  }
+}, true);
+
 function showMovie(id){stopAllPreviews();const m=movies.find(x=>String(x.id)===String(id));if(!m)return;selectedMovie=m;openPlayer();}
 
 let activePlayerJS = null;
@@ -277,4 +307,3 @@ const movieFocusObserver=new MutationObserver(()=>{
   }
 });
 movieFocusObserver.observe($('movieGrid'),{childList:true});
-
