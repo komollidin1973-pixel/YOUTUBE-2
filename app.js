@@ -33,7 +33,22 @@ function openPlayer() {
   wrap.replaceChildren();
   $("playerTitle").textContent = selectedMovie.title || "YOUTUBE-2";
 
-  $("playerDialog").showModal();
+  const dialog = $("playerDialog");
+  dialog.showModal();
+
+  // Make the player occupy the whole TV screen as soon as a movie is selected.
+  // The CSS full-viewport dialog is the fallback for WebViews that reject the
+  // Fullscreen API. requestFullscreen is attempted directly from the click flow.
+  try {
+    if (dialog.requestFullscreen && !document.fullscreenElement) {
+      const fullscreenRequest = dialog.requestFullscreen();
+      if (fullscreenRequest && typeof fullscreenRequest.catch === "function") {
+        fullscreenRequest.catch(error => console.info("Fullscreen API fallback:", error));
+      }
+    }
+  } catch (error) {
+    console.info("Fullscreen API unavailable; using full-screen dialog.", error);
+  }
 
   // Direct MP4 / HLS / DASH sources use PlayerJS.
   if (isDirectVideoUrl(url)) {
@@ -83,7 +98,17 @@ function closePlayer() {
   }
   activePlayerJS = null;
   $("playerFrameWrap").replaceChildren();
+  if (document.fullscreenElement && document.exitFullscreen) {
+    try {
+      const exitRequest = document.exitFullscreen();
+      if (exitRequest && typeof exitRequest.catch === "function") exitRequest.catch(()=>{});
+    } catch (error) { console.info("Fullscreen exit:", error); }
+  }
   $("playerDialog").close();
+  if (selectedMovie) {
+    const card = [...document.querySelectorAll('.movie-card')].find(el => el.dataset.id === String(selectedMovie.id));
+    if (card) card.focus({preventScroll:true});
+  }
 }
 
 function clearForm(){$("movieForm").reset();$("movieId").value="";$("movieLanguage").value="O‘zbek tilida";$("moviePublished").checked=true;}
@@ -116,5 +141,40 @@ $("menuToggle").addEventListener("click",()=>$("sidebar").classList.toggle("open
 db.auth.onAuthStateChange((_event,session)=>{adminUser=session?.user||null;if($("adminDialog").open)updateAdminView();});
 loadMovies();
 
-// Android TV remote: BACK/ESC closes the active player cleanly.
-document.addEventListener("keydown",e=>{if((e.key==="Escape"||e.key==="Backspace")&&$("playerDialog").open){e.preventDefault();closePlayer();}});
+// Android TV remote navigation: arrows move focus, OK selects, BACK closes player.
+function visibleFocusable(){
+  return [...document.querySelectorAll('button:not([disabled]), input:not([disabled]), .movie-card[tabindex="0"]')]
+    .filter(el=>!el.closest('.hidden') && el.getClientRects().length);
+}
+function focusMovieCard(index){
+  const cards=[...document.querySelectorAll('.movie-card[tabindex="0"]')];
+  if(!cards.length)return;
+  const target=cards[Math.max(0,Math.min(index,cards.length-1))];
+  target.focus({preventScroll:false});
+}
+document.addEventListener("keydown",e=>{
+  if((e.key==="Escape"||e.key==="Backspace")&&$("playerDialog").open){e.preventDefault();closePlayer();return;}
+  if($("playerDialog").open)return;
+  const current=document.activeElement;
+  const cards=[...document.querySelectorAll('.movie-card[tabindex="0"]')];
+  if(cards.includes(current)&&["ArrowRight","ArrowLeft","ArrowDown","ArrowUp"].includes(e.key)){
+    e.preventDefault();
+    const cols=Math.max(1,Math.round($('movieGrid').getBoundingClientRect().width/(cards[0].getBoundingClientRect().width+20)));
+    const i=cards.indexOf(current);
+    if(e.key==="ArrowRight")focusMovieCard(i+1);
+    if(e.key==="ArrowLeft")focusMovieCard(i-1);
+    if(e.key==="ArrowDown")focusMovieCard(i+cols);
+    if(e.key==="ArrowUp"){if(i-cols>=0)focusMovieCard(i-cols);else $('searchInput').focus();}
+    return;
+  }
+  if((e.key==="ArrowDown"||e.key==="ArrowUp") && (current===$('searchInput')||current===document.body)){
+    if(cards.length){e.preventDefault();focusMovieCard(0);}
+  }
+});
+// Put initial focus on the first movie when the catalogue has loaded.
+const movieFocusObserver=new MutationObserver(()=>{
+  if(document.querySelector('.movie-card[tabindex="0"]') && !document.activeElement.closest?.('input,button,.movie-card')){
+    document.querySelector('.movie-card[tabindex="0"]').focus({preventScroll:true});
+  }
+});
+movieFocusObserver.observe($('movieGrid'),{childList:true});

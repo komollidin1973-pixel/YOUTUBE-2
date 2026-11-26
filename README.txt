@@ -1,19 +1,21 @@
-YOUTUBE-2 — Android TV redesign
+YOUTUBE-2 — YouTube uslubidagi Android TV dizayni
 
-Fayllar:
+GitHub repozitoriy asosiy papkasiga quyidagi 4 faylni joylang:
 - index.html
 - app.js
 - styles.css
 - playerjs.js
 
-GitHub Pages repozitoriyasining asosiy papkasidagi shu nomli fayllarni almashtiring.
+Eski shu nomli fayllarni almashtiring va Commit changes qiling.
 
 O'zgarishlar:
-- Katta hero/banner olib tashlandi.
-- Kino kartochkasini tanlash bilan player darhol ochiladi.
-- MP4/M3U8/MPD/WebM manbalari PlayerJS orqali ochiladi.
-- Iframe manbalari iframe sifatida ochilishda davom etadi.
-- Admin panel yashirildi: logotipni 1.2 soniya bosib turing yoki 2.2 soniya ichida 5 marta bosing.
-- Player oynasida Orqaga tugmasi va Escape/Backspace boshqaruvi mavjud.
+- Katta banner olib tashlandi; kino katalogi darhol ko'rinadi.
+- Kino kartochkasini OK bosib tanlash bilan player ochiladi.
+- MP4/M3U8/MPD/WebM bevosita manbalari PlayerJS'da ochiladi.
+- Embed sahifalari iframe orqali ochiladi.
+- Kichik yashirin admin: logotipni 1.2 soniya bosib turish yoki 2.2 soniyada 5 marta bosish.
+- Android TV pultidagi yo'nalish tugmalari bilan kino kartochkalari orasida yurish.
+- OK/Enter kino tanlaydi; Back/Escape playerdan qaytaradi.
+- Supabase katalogi, sevimlilar va admin panel saqlangan.
 
-Eslatma: PlayerJS bevosita video manbalarida ishlaydi. Uchinchi tomon iframe ichidagi playerni PlayerJS bilan almashtira olmaydi.
+Eslatma: PlayerJS uchinchi tomon iframe ichidagi playerni o'rnini bosa olmaydi. Bunday manbalar iframe sifatida qoladi.
