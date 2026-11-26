@@ -277,3 +277,4 @@ const movieFocusObserver=new MutationObserver(()=>{
   }
 });
 movieFocusObserver.observe($('movieGrid'),{childList:true});
+
