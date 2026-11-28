@@ -1,0 +1,9 @@
+YOUTUBE-KINO Android TV poster focus fix
+
+Changes:
+- On catalog load, focus starts on the first movie poster (not search).
+- D-pad arrows navigate between poster cards by their on-screen positions.
+- At the edge of the poster grid, focus stays in the grid rather than jumping to the search field.
+- Selecting a poster with OK retains the existing movie-open behavior.
+
+Source used: YOUTUBE-2-main (3).zip. Replace the website files on GitHub Pages with these files.

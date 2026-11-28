@@ -21,6 +21,7 @@ async function loadMovies(){
     movies=[];
   }
   render();
+  requestAnimationFrame(focusFirstPoster);
 }
 function filteredMovies(){let a=[...movies];if(favoritesOnly)a=a.filter(m=>favorites.has(String(m.id)));else if(activeGenre)a=a.filter(m=>(m.genre||"").toLowerCase().includes(activeGenre.toLowerCase()));else if(activeCategory==="Trend")a=a.filter(m=>m.trending||m.featured);else if(activeCategory==="Tarjima")a=a.filter(m=>m.type==="Tarjima");else if(activeCategory==="Serial")a=a.filter(m=>m.type==="Serial");if(searchTerm)a=a.filter(m=>(m.title+" "+m.genre+" "+m.year).toLowerCase().includes(searchTerm));return a;}
 function posterMarkup(m){const u=safeHttpUrl(m.poster);return u?'<img loading="lazy" src="'+safeText(u)+'" alt="'+safeText(m.title)+'" onerror="this.remove()">':'<div class="poster-placeholder">▶</div>';}
@@ -56,6 +57,38 @@ function startPosterPreview(card){
   }else{video.src=source;}
 }
 function schedulePosterPreview(card){clearTimeout(posterPreviewTimer);posterPreviewTimer=setTimeout(()=>startPosterPreview(card),450);}
+function focusFirstPoster(){
+  const first=$("movieGrid")?.querySelector(".movie-card");
+  if(!first)return;
+  const active=document.activeElement;
+  if(active && (active.tagName==="INPUT" || active.tagName==="TEXTAREA" || active.isContentEditable))return;
+  first.focus({preventScroll:false});
+}
+function moveMovieFocus(direction){
+  const grid=$("movieGrid"), cards=[...grid.querySelectorAll(".movie-card")];
+  if(!cards.length)return false;
+  let current=document.activeElement;
+  if(!current?.classList?.contains("movie-card")){
+    focusFirstPoster(); return true;
+  }
+  const from=current.getBoundingClientRect();
+  const cx=from.left+from.width/2, cy=from.top+from.height/2;
+  let best=null,bestScore=Infinity;
+  for(const card of cards){
+    if(card===current)continue;
+    const r=card.getBoundingClientRect(), x=r.left+r.width/2, y=r.top+r.height/2;
+    const dx=x-cx, dy=y-cy;
+    let primary,secondary;
+    if(direction==="ArrowRight"){if(dx<=2)continue;primary=dx;secondary=Math.abs(dy);}
+    else if(direction==="ArrowLeft"){if(dx>=-2)continue;primary=-dx;secondary=Math.abs(dy);}
+    else if(direction==="ArrowDown"){if(dy<=2)continue;primary=dy;secondary=Math.abs(dx);}
+    else {if(dy>=-2)continue;primary=-dy;secondary=Math.abs(dx);}
+    const score=primary+secondary*1.8;
+    if(score<bestScore){bestScore=score;best=card;}
+  }
+  if(best){best.focus({preventScroll:false});best.scrollIntoView({block:"nearest",inline:"nearest"});}
+  return true;
+}
 function render(){stopPosterPreview();const list=filteredMovies();$("movieGrid").innerHTML=list.map(m=>'<article class="movie-card" data-id="'+safeText(m.id)+'" tabindex="0" role="button"><div class="poster">'+posterMarkup(m)+(m.featured?'<span class="poster-badge">TAVSIYA</span>':'')+'<span class="poster-type">'+safeText(m.type)+'</span></div><div class="movie-info"><div class="movie-title">'+safeText(m.title)+'</div><div class="movie-meta">'+safeText(m.year||"—")+' · '+safeText(m.genre||"Kino")+'</div></div></article>').join("");$("emptyState").classList.toggle("hidden",list.length!==0);$("resultCount").textContent=list.length+" ta kino";$("sectionTitle").textContent=favoritesOnly?"Sevimlilar":activeGenre||({Trend:"Trenddagi kinolar",Tarjima:"Tarjima kinolar",Serial:"Seriallar"}[activeCategory]||"Barcha kinolar");document.querySelectorAll(".chip").forEach(c=>c.classList.toggle("selected",c.dataset.filter===activeCategory&&!activeGenre&&!favoritesOnly));}
 function showMovie(id){stopPosterPreview();const m=movies.find(x=>String(x.id)===String(id));if(!m)return;selectedMovie=m;$("dialogTitle").textContent=m.title;$("dialogMeta").textContent=[m.year,m.type,m.genre,m.language].filter(Boolean).join(" · ");$("dialogDescription").textContent=m.description||"Tavsif hali qo‘shilmagan.";$("dialogPoster").style.backgroundImage=safeHttpUrl(m.poster)?"url('"+safeHttpUrl(m.poster).replace(/'/g,"%27")+"')":"linear-gradient(110deg,#252525,#171717)";$("favoriteButton").textContent=favorites.has(String(id))?"♥ Sevimlilardan olish":"♡ Sevimlilarga";$("watchButton").disabled=!safeHttpUrl(m.url);$("watchButton").style.opacity=m.url?1:.5;$("sourceNote").textContent=m.url?"Manbaning embed ruxsati va mavjudligi sayt egasiga bog‘liq.":"Bu kinoga video manbasi qo‘shilmagan.";$("movieDialog").showModal();}
 function openBrowserMedia(url,title,kind){
@@ -88,41 +121,17 @@ async function refreshAdmin(){const {data,error}=await db.from("movies").select(
 function updateAdminView(){const logged=!!adminUser;$("adminLoginSection").classList.toggle("hidden",logged);$("adminTools").classList.toggle("hidden",!logged);if(logged){$("adminIdentity").textContent=adminUser.email||"Admin";refreshAdmin();}}
 async function editMovie(id){const {data,error}=await db.from("movies").select("*").eq("id",id).single();if(error){toast(error.message);return;}const m=fromDb(data);$("movieId").value=m.id;$("movieTitle").value=m.title;$("movieYear").value=m.year||"";$("movieType").value=m.type||"Film";$("movieGenre").value=m.genre;$("movieLanguage").value=m.language;$("moviePoster").value=m.poster;$("movieDescription").value=m.description;$("movieUrl").value=m.url;$("movieFeatured").checked=m.featured;$("moviePublished").checked=m.is_published;$("movieTitle").focus();}
 $("year").textContent=new Date().getFullYear();$("footerYear").textContent=new Date().getFullYear();
-function openMovieFromCard(id){
-  const movie=movies.find(m=>String(m.id)===String(id));
-  if(!movie)return;
-  stopPosterPreview();
-  // Android TV APK: skip the details dialog and launch playback immediately.
-  // Direct MP4/HLS/DASH sources go to native Media3; provider embeds use the app's embed bridge.
-  if(window.AndroidPlayer){
-    const url=safeHttpUrl(movie.url);
-    if(!url){toast("Bu kino uchun video manbasi qo‘shilmagan.");return;}
-    try{
-      const kind=mediaKind(url);
-      if(kind!=="embed"&&typeof window.AndroidPlayer.play==="function"){
-        window.AndroidPlayer.play(url,movie.title||"YOUTUBE-2");
-        return;
-      }
-      if(kind==="embed"&&typeof window.AndroidPlayer.playEmbed==="function"){
-        window.AndroidPlayer.playEmbed(url,movie.title||"YOUTUBE-2",location.href);
-        return;
-      }
-    }catch(err){console.error("Android TV playback launch failed",err);toast("Pleyerni ochib bo‘lmadi.");return;}
-  }
-  // Desktop/mobile web keeps the poster details dialog.
-  showMovie(id);
-}
-$("movieGrid").addEventListener("click",e=>{const c=e.target.closest("[data-id]");if(c)openMovieFromCard(c.dataset.id);});
-$("movieGrid").addEventListener("keydown",e=>{if((e.key==="Enter"||e.key===" ")&&e.target.matches("[data-id]")){e.preventDefault();openMovieFromCard(e.target.dataset.id);}});
+$("movieGrid").addEventListener("click",e=>{const c=e.target.closest("[data-id]");if(c)showMovie(c.dataset.id);});
+$("movieGrid").addEventListener("keydown",e=>{if((e.key==="Enter"||e.key===" ")&&e.target.matches("[data-id]")){e.preventDefault();showMovie(e.target.dataset.id);}});
 $("movieGrid").addEventListener("pointerover",e=>{const card=e.target.closest(".movie-card");if(card&&!card.contains(e.relatedTarget))schedulePosterPreview(card);});
 $("movieGrid").addEventListener("pointerout",e=>{const card=e.target.closest(".movie-card");if(card&&!card.contains(e.relatedTarget))stopPosterPreview();});
-$("movieGrid").addEventListener("focusin",e=>{const card=e.target.closest(".movie-card");if(card&&!window.AndroidPlayer)schedulePosterPreview(card);});
+$("movieGrid").addEventListener("focusin",e=>{const card=e.target.closest(".movie-card");if(card)schedulePosterPreview(card);});
 $("movieGrid").addEventListener("focusout",e=>{const card=e.target.closest(".movie-card");if(card&&!card.contains(e.relatedTarget))stopPosterPreview();});
 $("searchInput").addEventListener("input",e=>{searchTerm=e.target.value.trim().toLowerCase();render();});$("searchForm").addEventListener("submit",e=>{e.preventDefault();render();});
-document.querySelectorAll("[data-category]").forEach(b=>b.addEventListener("click",()=>{activeCategory=b.dataset.category;activeGenre="";favoritesOnly=false;$("sidebar").classList.remove("open");render();}));
-document.querySelectorAll("[data-genre]").forEach(b=>b.addEventListener("click",()=>{activeGenre=b.dataset.genre;activeCategory="Barchasi";favoritesOnly=false;$("sidebar").classList.remove("open");render();}));
-document.querySelectorAll("[data-filter]").forEach(b=>b.addEventListener("click",()=>{activeCategory=b.dataset.filter;activeGenre="";favoritesOnly=false;render();}));
-$("favoritesNav").addEventListener("click",()=>{favoritesOnly=true;activeGenre="";$("sidebar").classList.remove("open");render();});
+document.querySelectorAll("[data-category]").forEach(b=>b.addEventListener("click",()=>{activeCategory=b.dataset.category;activeGenre="";favoritesOnly=false;$("sidebar").classList.remove("open");render();focusFirstPoster();}));
+document.querySelectorAll("[data-genre]").forEach(b=>b.addEventListener("click",()=>{activeGenre=b.dataset.genre;activeCategory="Barchasi";favoritesOnly=false;$("sidebar").classList.remove("open");render();focusFirstPoster();}));
+document.querySelectorAll("[data-filter]").forEach(b=>b.addEventListener("click",()=>{activeCategory=b.dataset.filter;activeGenre="";favoritesOnly=false;render();focusFirstPoster();}));
+$("favoritesNav").addEventListener("click",()=>{favoritesOnly=true;activeGenre="";$("sidebar").classList.remove("open");render();focusFirstPoster();});
 $("favoriteButton").addEventListener("click",()=>{if(!selectedMovie)return;const id=String(selectedMovie.id);if(favorites.has(id))favorites.delete(id);else favorites.add(id);localStorage.setItem(FAVORITES_KEY,JSON.stringify([...favorites]));$("favoriteButton").textContent=favorites.has(id)?"♥ Sevimlilardan olish":"♡ Sevimlilarga";render();});
 $("watchButton").addEventListener("click",openPlayer);$("dialogClose").addEventListener("click",()=>$("movieDialog").close());$("playerClose").addEventListener("click",()=>{$("playerFrameWrap").replaceChildren();$("playerDialog").close();});
 $("adminToggle").addEventListener("click",()=>{$("adminDialog").showModal();updateAdminView();});
@@ -140,6 +149,15 @@ $("adminMovieList").addEventListener("click",async e=>{const edit=e.target.close
 $("menuToggle").addEventListener("click",()=>$("sidebar").classList.toggle("open"));
 db.auth.onAuthStateChange((_event,session)=>{adminUser=session?.user||null;if($("adminDialog").open)updateAdminView();});
 loadMovies();
+
+// Android TV D-pad: keep navigation inside the movie poster grid.
+document.addEventListener("keydown", e => {
+  if(!["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key))return;
+  if($("playerDialog").open || $("movieDialog").open || $("adminDialog").open)return;
+  const active=document.activeElement;
+  if(active && (active.tagName==="INPUT" || active.tagName==="TEXTAREA" || active.isContentEditable))return;
+  if(moveMovieFocus(e.key))e.preventDefault();
+}, true);
 
 // Android TV / keyboard BACK handling for dialogs
 document.addEventListener("keydown", e => {
