@@ -243,3 +243,22 @@ body { overflow-y:auto !important; }
 @media (max-width:899px) {
   .tv-catalog .movie-grid { grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
 }
+
+/* TV movie details: large full poster with one clear Watch action */
+.movie-dialog{width:min(520px,calc(100% - 28px));max-height:94vh;overflow:auto}
+.movie-dialog .dialog-poster{width:100%;height:auto;aspect-ratio:2/3;max-height:72vh;background-color:#090909;background-position:center;background-size:contain;background-repeat:no-repeat}
+.movie-dialog .dialog-body{padding:14px 18px 18px;text-align:center}
+.movie-dialog .dialog-body>.eyebrow,
+.movie-dialog .dialog-body>h2,
+.movie-dialog .dialog-body>.movie-meta,
+.movie-dialog .dialog-body>p,
+.movie-dialog #favoriteButton{display:none!important}
+.movie-dialog .dialog-actions{margin:0;display:flex;justify-content:center}
+.movie-dialog #watchButton{width:100%;min-height:54px;font-size:18px;border-radius:9px}
+.movie-dialog .dialog-close{position:sticky}
+@media(max-height:650px){.movie-dialog .dialog-poster{max-height:65vh}.movie-dialog{max-height:96vh}}
+
+
+/* Admin tugmasi ko'rinmaydi; admin faqat logotip orqali ochiladi. */
+.admin-button.hidden, #adminToggle.hidden { display:none !important; visibility:hidden !important; pointer-events:none !important; }
+#brandSecret { cursor:pointer; touch-action:manipulation; user-select:none; -webkit-user-select:none; }
