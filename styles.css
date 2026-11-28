@@ -374,3 +374,11 @@ body { overflow-y:auto !important; }
 .movie-dialog { width:min(520px,calc(100vw - 28px)) !important; max-height:92vh !important; overflow:hidden !important; }
 .movie-dialog .dialog-poster { aspect-ratio:2 / 3 !important; background-size:contain !important; background-position:center !important; }
 .movie-dialog .poster-watch-button { left:50% !important; top:50% !important; transform:translate(-50%,-50%) !important; }
+
+
+/* TV/home layout: remove the redundant catalog heading and filter chips.
+   Keep their DOM nodes so existing app.js event handlers remain safe. */
+.catalog-section > .section-heading,
+.catalog-section > .chips {
+  display: none !important;
+}
