@@ -322,7 +322,7 @@ body { overflow-y:auto !important; }
 }
 
 
-/* Silent 12-second poster preview on mouse hover / Android TV focus. */
+/* 12-second poster preview with audio on mouse hover / Android TV focus. */
 .movie-card .poster{position:relative;overflow:hidden;}
 .poster-preview-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000;z-index:1;display:block;}
 .movie-card.is-previewing .poster img{visibility:hidden;}

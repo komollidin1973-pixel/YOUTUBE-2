@@ -24,7 +24,7 @@ async function loadMovies(){
 }
 function filteredMovies(){let a=[...movies];if(favoritesOnly)a=a.filter(m=>favorites.has(String(m.id)));else if(activeGenre)a=a.filter(m=>(m.genre||"").toLowerCase().includes(activeGenre.toLowerCase()));else if(activeCategory==="Trend")a=a.filter(m=>m.trending||m.featured);else if(activeCategory==="Tarjima")a=a.filter(m=>m.type==="Tarjima");else if(activeCategory==="Serial")a=a.filter(m=>m.type==="Serial");if(searchTerm)a=a.filter(m=>(m.title+" "+m.genre+" "+m.year).toLowerCase().includes(searchTerm));return a;}
 function posterMarkup(m){const u=safeHttpUrl(m.poster);return u?'<img loading="lazy" src="'+safeText(u)+'" alt="'+safeText(m.title)+'" onerror="this.remove()">':'<div class="poster-placeholder">▶</div>';}
-// Poster preview: starts at 40:12 by default, plays silently for 12 seconds.
+// Poster preview: starts at 40:12 by default, plays with sound for 12 seconds.
 let activePosterPreview=null, posterPreviewTimer=null;
 function stopPosterPreview(){
   clearTimeout(posterPreviewTimer);posterPreviewTimer=null;
@@ -42,10 +42,10 @@ function startPosterPreview(card){
   if(!source||mediaKind(source)==="embed")return; // cross-origin embed pages cannot be previewed from the poster
   const poster=card.querySelector(".poster");if(!poster)return;
   const video=document.createElement("video");
-  video.className="poster-preview-video";video.muted=true;video.defaultMuted=true;video.autoplay=true;video.playsInline=true;video.preload="auto";video.setAttribute("muted","");video.setAttribute("playsinline","");
+  video.className="poster-preview-video";video.muted=false;video.defaultMuted=false;video.volume=0.65;video.autoplay=true;video.playsInline=true;video.preload="auto";video.removeAttribute("muted");video.setAttribute("playsinline","");
   poster.append(video);card.classList.add("is-previewing");activePosterPreview={video,card};
   const startAt=safeHttpUrl(movie.preview_url)?0:Math.max(0,Number(movie.preview_start_seconds)||2412);
-  const begin=()=>{try{if(startAt>0)video.currentTime=startAt;}catch(e){}const playPromise=video.play();if(playPromise?.catch)playPromise.catch(()=>stopPosterPreview());};
+  const begin=()=>{try{if(startAt>0)video.currentTime=startAt;}catch(e){}video.muted=false;video.volume=0.65;const playPromise=video.play();if(playPromise?.catch)playPromise.catch(err=>{console.warn("Preview autoplay/audio blocked by browser policy",err);stopPosterPreview();});};
   video.addEventListener("loadedmetadata",begin,{once:true});
   video.addEventListener("timeupdate",()=>{if(video.currentTime>=startAt+12)stopPosterPreview();});
   video.addEventListener("ended",stopPosterPreview,{once:true});

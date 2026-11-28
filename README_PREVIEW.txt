@@ -21,4 +21,4 @@ Bu `movies` jadvaliga `preview_url` va `preview_start_seconds` ustunlarini qo‘
 ## Muhim cheklov
 Poster ichidagi preview faqat to‘g‘ridan-to‘g‘ri MP4/WebM yoki qo‘llab-quvvatlanadigan HLS (.m3u8) manbada ishlaydi.
 YouTube/Vimeo yoki boshqa saytlarning iframe/embed URL'idan boshqa domen ichidagi videoni ajratib olish brauzer xavfsizligi sababli mumkin emas. Bunday kino uchun alohida `preview_url` (to‘g‘ridan-to‘g‘ri MP4 lavha) kerak.
-Preview avtomatik muted ishlaydi; asosiy filmni bosganda avvalgi player oqimi o‘zgarmaydi.
+Preview ovoz bilan ishlaydi (65% balandlikda); asosiy filmni bosganda avvalgi player oqimi o‘zgarmaydi. Eslatma: ayrim brauzerlar foydalanuvchi harakatidan oldin ovozli autoplayni bloklashi mumkin. Bunday holatda TV pultida posterga yo‘nalish tugmasi bilan fokus bering yoki bir marta OK bosing; agar brauzer baribir bloklasa, uning autoplay siyosatini chetlab o‘tib bo‘lmaydi.
