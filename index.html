@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#0f0f0f">
   <title>YOUTUBE-2 — Kino olami</title>
-  <link rel="stylesheet" href="styles.css?v=20261128-adminsecret1">
+  <link rel="stylesheet" href="styles.css?v=20261128-centerplay1">
 </head>
 <body>
 <header class="topbar">
@@ -52,16 +52,15 @@
 
 <dialog class="movie-dialog" id="movieDialog">
   <button class="dialog-close" id="dialogClose" type="button" aria-label="Yopish">×</button>
-  <div class="dialog-poster" id="dialogPoster"></div>
-  <div class="dialog-body">
+  <div class="dialog-poster" id="dialogPoster">
+    <button class="primary-button poster-watch-button" id="watchButton" type="button">▶ Ko‘rish</button>
+  </div>
+  <div class="dialog-body dialog-accessibility-data" aria-hidden="true">
     <div class="eyebrow">YOUTUBE-2 KINO</div>
     <h2 id="dialogTitle">Kino</h2>
     <div class="movie-meta" id="dialogMeta"></div>
     <p id="dialogDescription"></p>
-    <div class="dialog-actions">
-      <button class="primary-button" id="watchButton" type="button">▶ Ko‘rish</button>
-      <button class="secondary-button" id="favoriteButton" type="button">♡ Sevimlilarga</button>
-    </div>
+    <button class="secondary-button" id="favoriteButton" type="button">♡ Sevimlilarga</button>
     <p class="source-note" id="sourceNote"></p>
   </div>
 </dialog>
@@ -104,6 +103,6 @@
   window.YOUTUBE2_SUPABASE_KEY = "sb_publishable_wZ-0jGIcVQ7ryZ-edLHlVA_pFhPXUCJ";
 </script>
 <script src="playerjs.js?v=20261128-fix2"></script>
-<script src="app.js?v=20261128-adminsecret1"></script>
+<script src="app.js?v=20261128-centerplay-preview2412"></script>
 </body></html>
 

@@ -7,7 +7,7 @@ function safeText(v){return String(v??"").replace(/[&<>\"']/g,c=>({"&":"&amp;","
 function safeHttpUrl(v){try{const u=new URL(v);return ["https:","http:"].includes(u.protocol)?u.href:"";}catch{return "";}}
 function mediaKind(raw){try{const u=new URL(raw);const p=u.pathname.toLowerCase();if(/\.m3u8$/.test(p))return "hls";if(/\.mpd$/.test(p))return "dash";if(/\.(mp4|m4v|webm|mov)$/.test(p))return "file";return "embed";}catch{return "embed";}}
 function toast(msg){$("toast").textContent=msg;$("toast").classList.remove("hidden");setTimeout(()=>$ ("toast").classList.add("hidden"),3500);}
-function fromDb(row){return {id:row.id,title:row.title,year:row.year,type:row.type||"Film",genre:row.genre||"",language:row.language||"",description:row.description||"",poster:row.poster_url||"",url:row.video_url||"",featured:!!row.featured,trending:!!row.trending,is_published:!!row.is_published};}
+function fromDb(row){return {id:row.id,title:row.title,year:row.year,type:row.type||"Film",genre:row.genre||"",language:row.language||"",description:row.description||"",poster:row.poster_url||"",url:row.video_url||"",preview_url:row.preview_url||"",preview_start_seconds:Number.isFinite(Number(row.preview_start_seconds))?Number(row.preview_start_seconds):2412,featured:!!row.featured,trending:!!row.trending,is_published:!!row.is_published};}
 function toDb(m){return {title:m.title,year:m.year, type:m.type,genre:m.genre,language:m.language,description:m.description,poster_url:m.poster,video_url:m.url,featured:m.featured,is_published:m.is_published};}
 async function loadMovies(){
   $("resultCount").textContent="Yuklanmoqda…";
@@ -24,8 +24,40 @@ async function loadMovies(){
 }
 function filteredMovies(){let a=[...movies];if(favoritesOnly)a=a.filter(m=>favorites.has(String(m.id)));else if(activeGenre)a=a.filter(m=>(m.genre||"").toLowerCase().includes(activeGenre.toLowerCase()));else if(activeCategory==="Trend")a=a.filter(m=>m.trending||m.featured);else if(activeCategory==="Tarjima")a=a.filter(m=>m.type==="Tarjima");else if(activeCategory==="Serial")a=a.filter(m=>m.type==="Serial");if(searchTerm)a=a.filter(m=>(m.title+" "+m.genre+" "+m.year).toLowerCase().includes(searchTerm));return a;}
 function posterMarkup(m){const u=safeHttpUrl(m.poster);return u?'<img loading="lazy" src="'+safeText(u)+'" alt="'+safeText(m.title)+'" onerror="this.remove()">':'<div class="poster-placeholder">▶</div>';}
-function render(){const list=filteredMovies();$("movieGrid").innerHTML=list.map(m=>'<article class="movie-card" data-id="'+safeText(m.id)+'" tabindex="0" role="button"><div class="poster">'+posterMarkup(m)+(m.featured?'<span class="poster-badge">TAVSIYA</span>':'')+'<span class="poster-type">'+safeText(m.type)+'</span></div><div class="movie-info"><div class="movie-title">'+safeText(m.title)+'</div><div class="movie-meta">'+safeText(m.year||"—")+' · '+safeText(m.genre||"Kino")+'</div></div></article>').join("");$("emptyState").classList.toggle("hidden",list.length!==0);$("resultCount").textContent=list.length+" ta kino";$("sectionTitle").textContent=favoritesOnly?"Sevimlilar":activeGenre||({Trend:"Trenddagi kinolar",Tarjima:"Tarjima kinolar",Serial:"Seriallar"}[activeCategory]||"Barcha kinolar");document.querySelectorAll(".chip").forEach(c=>c.classList.toggle("selected",c.dataset.filter===activeCategory&&!activeGenre&&!favoritesOnly));}
-function showMovie(id){const m=movies.find(x=>String(x.id)===String(id));if(!m)return;selectedMovie=m;$("dialogTitle").textContent=m.title;$("dialogMeta").textContent=[m.year,m.type,m.genre,m.language].filter(Boolean).join(" · ");$("dialogDescription").textContent=m.description||"Tavsif hali qo‘shilmagan.";$("dialogPoster").style.backgroundImage=safeHttpUrl(m.poster)?"url('"+safeHttpUrl(m.poster).replace(/'/g,"%27")+"')":"linear-gradient(110deg,#252525,#171717)";$("favoriteButton").textContent=favorites.has(String(id))?"♥ Sevimlilardan olish":"♡ Sevimlilarga";$("watchButton").disabled=!safeHttpUrl(m.url);$("watchButton").style.opacity=m.url?1:.5;$("sourceNote").textContent=m.url?"Manbaning embed ruxsati va mavjudligi sayt egasiga bog‘liq.":"Bu kinoga video manbasi qo‘shilmagan.";$("movieDialog").showModal();}
+// Poster preview: starts at 40:12 by default, plays silently for 12 seconds.
+let activePosterPreview=null, posterPreviewTimer=null;
+function stopPosterPreview(){
+  clearTimeout(posterPreviewTimer);posterPreviewTimer=null;
+  if(!activePosterPreview)return;
+  const {video,card}=activePosterPreview;
+  try{video.pause();video.removeAttribute("src");video.load();}catch(e){}
+  video.remove();card.classList.remove("is-previewing");activePosterPreview=null;
+}
+function startPosterPreview(card){
+  if(!card||activePosterPreview?.card===card)return;
+  stopPosterPreview();
+  const movie=movies.find(m=>String(m.id)===String(card.dataset.id));
+  if(!movie)return;
+  const source=safeHttpUrl(movie.preview_url)||safeHttpUrl(movie.url);
+  if(!source||mediaKind(source)==="embed")return; // cross-origin embed pages cannot be previewed from the poster
+  const poster=card.querySelector(".poster");if(!poster)return;
+  const video=document.createElement("video");
+  video.className="poster-preview-video";video.muted=true;video.defaultMuted=true;video.autoplay=true;video.playsInline=true;video.preload="auto";video.setAttribute("muted","");video.setAttribute("playsinline","");
+  poster.append(video);card.classList.add("is-previewing");activePosterPreview={video,card};
+  const startAt=safeHttpUrl(movie.preview_url)?0:Math.max(0,Number(movie.preview_start_seconds)||2412);
+  const begin=()=>{try{if(startAt>0)video.currentTime=startAt;}catch(e){}const playPromise=video.play();if(playPromise?.catch)playPromise.catch(()=>stopPosterPreview());};
+  video.addEventListener("loadedmetadata",begin,{once:true});
+  video.addEventListener("timeupdate",()=>{if(video.currentTime>=startAt+12)stopPosterPreview();});
+  video.addEventListener("ended",stopPosterPreview,{once:true});
+  video.addEventListener("error",stopPosterPreview,{once:true});
+  if(mediaKind(source)==="hls"&&!video.canPlayType("application/vnd.apple.mpegurl")){
+    const attach=()=>{if(!window.Hls||!Hls.isSupported()){stopPosterPreview();return;}const h=new Hls({enableWorker:true,lowLatencyMode:false,backBufferLength:15});activePosterPreview.hls=h;h.loadSource(source);h.attachMedia(video);h.on(Hls.Events.MANIFEST_PARSED,begin);h.on(Hls.Events.ERROR,(_,d)=>{if(d.fatal)stopPosterPreview();});};
+    if(window.Hls)attach();else{const script=document.createElement("script");script.src="https://cdn.jsdelivr.net/npm/hls.js@1.5.18/dist/hls.min.js";script.onload=attach;script.onerror=stopPosterPreview;document.head.append(script);}
+  }else{video.src=source;}
+}
+function schedulePosterPreview(card){clearTimeout(posterPreviewTimer);posterPreviewTimer=setTimeout(()=>startPosterPreview(card),450);}
+function render(){stopPosterPreview();const list=filteredMovies();$("movieGrid").innerHTML=list.map(m=>'<article class="movie-card" data-id="'+safeText(m.id)+'" tabindex="0" role="button"><div class="poster">'+posterMarkup(m)+(m.featured?'<span class="poster-badge">TAVSIYA</span>':'')+'<span class="poster-type">'+safeText(m.type)+'</span></div><div class="movie-info"><div class="movie-title">'+safeText(m.title)+'</div><div class="movie-meta">'+safeText(m.year||"—")+' · '+safeText(m.genre||"Kino")+'</div></div></article>').join("");$("emptyState").classList.toggle("hidden",list.length!==0);$("resultCount").textContent=list.length+" ta kino";$("sectionTitle").textContent=favoritesOnly?"Sevimlilar":activeGenre||({Trend:"Trenddagi kinolar",Tarjima:"Tarjima kinolar",Serial:"Seriallar"}[activeCategory]||"Barcha kinolar");document.querySelectorAll(".chip").forEach(c=>c.classList.toggle("selected",c.dataset.filter===activeCategory&&!activeGenre&&!favoritesOnly));}
+function showMovie(id){stopPosterPreview();const m=movies.find(x=>String(x.id)===String(id));if(!m)return;selectedMovie=m;$("dialogTitle").textContent=m.title;$("dialogMeta").textContent=[m.year,m.type,m.genre,m.language].filter(Boolean).join(" · ");$("dialogDescription").textContent=m.description||"Tavsif hali qo‘shilmagan.";$("dialogPoster").style.backgroundImage=safeHttpUrl(m.poster)?"url('"+safeHttpUrl(m.poster).replace(/'/g,"%27")+"')":"linear-gradient(110deg,#252525,#171717)";$("favoriteButton").textContent=favorites.has(String(id))?"♥ Sevimlilardan olish":"♡ Sevimlilarga";$("watchButton").disabled=!safeHttpUrl(m.url);$("watchButton").style.opacity=m.url?1:.5;$("sourceNote").textContent=m.url?"Manbaning embed ruxsati va mavjudligi sayt egasiga bog‘liq.":"Bu kinoga video manbasi qo‘shilmagan.";$("movieDialog").showModal();}
 function openBrowserMedia(url,title,kind){
   const wrap=$("playerFrameWrap");wrap.replaceChildren();$("playerTitle").textContent=title;
   if(kind==="embed") { const frame=document.createElement("iframe");frame.src=url;frame.title=title;frame.allow="autoplay; fullscreen; picture-in-picture";frame.allowFullscreen=true;wrap.append(frame); }
@@ -58,6 +90,10 @@ async function editMovie(id){const {data,error}=await db.from("movies").select("
 $("year").textContent=new Date().getFullYear();$("footerYear").textContent=new Date().getFullYear();
 $("movieGrid").addEventListener("click",e=>{const c=e.target.closest("[data-id]");if(c)showMovie(c.dataset.id);});
 $("movieGrid").addEventListener("keydown",e=>{if((e.key==="Enter"||e.key===" ")&&e.target.matches("[data-id]")){e.preventDefault();showMovie(e.target.dataset.id);}});
+$("movieGrid").addEventListener("pointerover",e=>{const card=e.target.closest(".movie-card");if(card&&!card.contains(e.relatedTarget))schedulePosterPreview(card);});
+$("movieGrid").addEventListener("pointerout",e=>{const card=e.target.closest(".movie-card");if(card&&!card.contains(e.relatedTarget))stopPosterPreview();});
+$("movieGrid").addEventListener("focusin",e=>{const card=e.target.closest(".movie-card");if(card)schedulePosterPreview(card);});
+$("movieGrid").addEventListener("focusout",e=>{const card=e.target.closest(".movie-card");if(card&&!card.contains(e.relatedTarget))stopPosterPreview();});
 $("searchInput").addEventListener("input",e=>{searchTerm=e.target.value.trim().toLowerCase();render();});$("searchForm").addEventListener("submit",e=>{e.preventDefault();render();});
 document.querySelectorAll("[data-category]").forEach(b=>b.addEventListener("click",()=>{activeCategory=b.dataset.category;activeGenre="";favoritesOnly=false;$("sidebar").classList.remove("open");render();}));
 document.querySelectorAll("[data-genre]").forEach(b=>b.addEventListener("click",()=>{activeGenre=b.dataset.genre;activeCategory="Barchasi";favoritesOnly=false;$("sidebar").classList.remove("open");render();}));
