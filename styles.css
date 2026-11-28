@@ -327,3 +327,50 @@ body { overflow-y:auto !important; }
 .poster-preview-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000;z-index:1;display:block;}
 .movie-card.is-previewing .poster img{visibility:hidden;}
 .movie-card.is-previewing .poster-badge,.movie-card.is-previewing .poster-type{z-index:2;}
+
+
+/* RESTORE requested original home catalogue: landscape thumbnails, 3 columns */
+/* Keep the old home layout: sidebar + top bar + filter chips + wide movie thumbnails. */
+.main-content.tv-catalog { padding-top:66px !important; }
+.main-content.tv-catalog .home-banner { display:none !important; }
+.tv-catalog .catalog-section { padding-top:8px !important; }
+.tv-catalog .movie-grid {
+  display:grid !important;
+  grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+  grid-auto-flow:row !important;
+  gap:24px 18px !important;
+  overflow:visible !important;
+  width:100% !important;
+}
+.tv-catalog .movie-card { min-width:0 !important; width:100% !important; }
+.tv-catalog .poster {
+  width:100% !important;
+  height:auto !important;
+  aspect-ratio:16 / 9 !important;
+  border-radius:11px !important;
+  overflow:hidden !important;
+}
+.tv-catalog .poster img {
+  display:block !important;
+  width:100% !important;
+  height:100% !important;
+  aspect-ratio:16 / 9 !important;
+  object-fit:cover !important;
+}
+.tv-catalog .movie-info { padding:10px 3px 2px !important; }
+.tv-catalog .movie-title { font-size:16px !important; line-height:1.35 !important; }
+.tv-catalog .movie-meta { font-size:12px !important; }
+@media (min-width:900px) {
+  :root { --sidebar:230px; }
+  .main-content.tv-catalog { margin-left:var(--sidebar) !important; padding-left:30px !important; padding-right:30px !important; }
+  .tv-catalog .movie-grid { grid-template-columns:repeat(3,minmax(0,1fr)) !important; }
+}
+@media (max-width:899px) {
+  .tv-catalog .movie-grid { grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:18px 12px !important; }
+  .tv-catalog .poster { aspect-ratio:16 / 9 !important; }
+  .tv-catalog .poster img { aspect-ratio:16 / 9 !important; }
+}
+/* Modal remains a tall poster frame with the Watch button over the image center. */
+.movie-dialog { width:min(520px,calc(100vw - 28px)) !important; max-height:92vh !important; overflow:hidden !important; }
+.movie-dialog .dialog-poster { aspect-ratio:2 / 3 !important; background-size:contain !important; background-position:center !important; }
+.movie-dialog .poster-watch-button { left:50% !important; top:50% !important; transform:translate(-50%,-50%) !important; }
