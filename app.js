@@ -88,11 +88,35 @@ async function refreshAdmin(){const {data,error}=await db.from("movies").select(
 function updateAdminView(){const logged=!!adminUser;$("adminLoginSection").classList.toggle("hidden",logged);$("adminTools").classList.toggle("hidden",!logged);if(logged){$("adminIdentity").textContent=adminUser.email||"Admin";refreshAdmin();}}
 async function editMovie(id){const {data,error}=await db.from("movies").select("*").eq("id",id).single();if(error){toast(error.message);return;}const m=fromDb(data);$("movieId").value=m.id;$("movieTitle").value=m.title;$("movieYear").value=m.year||"";$("movieType").value=m.type||"Film";$("movieGenre").value=m.genre;$("movieLanguage").value=m.language;$("moviePoster").value=m.poster;$("movieDescription").value=m.description;$("movieUrl").value=m.url;$("movieFeatured").checked=m.featured;$("moviePublished").checked=m.is_published;$("movieTitle").focus();}
 $("year").textContent=new Date().getFullYear();$("footerYear").textContent=new Date().getFullYear();
-$("movieGrid").addEventListener("click",e=>{const c=e.target.closest("[data-id]");if(c)showMovie(c.dataset.id);});
-$("movieGrid").addEventListener("keydown",e=>{if((e.key==="Enter"||e.key===" ")&&e.target.matches("[data-id]")){e.preventDefault();showMovie(e.target.dataset.id);}});
+function openMovieFromCard(id){
+  const movie=movies.find(m=>String(m.id)===String(id));
+  if(!movie)return;
+  stopPosterPreview();
+  // Android TV APK: skip the details dialog and launch playback immediately.
+  // Direct MP4/HLS/DASH sources go to native Media3; provider embeds use the app's embed bridge.
+  if(window.AndroidPlayer){
+    const url=safeHttpUrl(movie.url);
+    if(!url){toast("Bu kino uchun video manbasi qo‘shilmagan.");return;}
+    try{
+      const kind=mediaKind(url);
+      if(kind!=="embed"&&typeof window.AndroidPlayer.play==="function"){
+        window.AndroidPlayer.play(url,movie.title||"YOUTUBE-2");
+        return;
+      }
+      if(kind==="embed"&&typeof window.AndroidPlayer.playEmbed==="function"){
+        window.AndroidPlayer.playEmbed(url,movie.title||"YOUTUBE-2",location.href);
+        return;
+      }
+    }catch(err){console.error("Android TV playback launch failed",err);toast("Pleyerni ochib bo‘lmadi.");return;}
+  }
+  // Desktop/mobile web keeps the poster details dialog.
+  showMovie(id);
+}
+$("movieGrid").addEventListener("click",e=>{const c=e.target.closest("[data-id]");if(c)openMovieFromCard(c.dataset.id);});
+$("movieGrid").addEventListener("keydown",e=>{if((e.key==="Enter"||e.key===" ")&&e.target.matches("[data-id]")){e.preventDefault();openMovieFromCard(e.target.dataset.id);}});
 $("movieGrid").addEventListener("pointerover",e=>{const card=e.target.closest(".movie-card");if(card&&!card.contains(e.relatedTarget))schedulePosterPreview(card);});
 $("movieGrid").addEventListener("pointerout",e=>{const card=e.target.closest(".movie-card");if(card&&!card.contains(e.relatedTarget))stopPosterPreview();});
-$("movieGrid").addEventListener("focusin",e=>{const card=e.target.closest(".movie-card");if(card)schedulePosterPreview(card);});
+$("movieGrid").addEventListener("focusin",e=>{const card=e.target.closest(".movie-card");if(card&&!window.AndroidPlayer)schedulePosterPreview(card);});
 $("movieGrid").addEventListener("focusout",e=>{const card=e.target.closest(".movie-card");if(card&&!card.contains(e.relatedTarget))stopPosterPreview();});
 $("searchInput").addEventListener("input",e=>{searchTerm=e.target.value.trim().toLowerCase();render();});$("searchForm").addEventListener("submit",e=>{e.preventDefault();render();});
 document.querySelectorAll("[data-category]").forEach(b=>b.addEventListener("click",()=>{activeCategory=b.dataset.category;activeGenre="";favoritesOnly=false;$("sidebar").classList.remove("open");render();}));
