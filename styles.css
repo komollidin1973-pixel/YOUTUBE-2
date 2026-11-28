@@ -230,3 +230,16 @@ body { overflow-y:auto !important; }
   .home-banner p { font-size:13px; }
   .tv-catalog .movie-title { font-size:14px !important; }
 }
+
+/* Repair: visible admin access and stable Android TV 3-column portrait poster grid */
+.admin-button { display:inline-flex !important; align-items:center; justify-content:center; }
+.admin-button.hidden { display:inline-flex !important; }
+.tv-catalog .movie-grid { display:grid !important; grid-template-columns:repeat(3,minmax(0,1fr)) !important; grid-auto-flow:row !important; overflow:visible !important; }
+.tv-catalog .poster { aspect-ratio:2/3 !important; height:auto !important; }
+.tv-catalog .poster img { object-fit:cover !important; }
+@media (min-width:900px) {
+  .tv-catalog .movie-grid { grid-template-columns:repeat(3,minmax(0,1fr)) !important; }
+}
+@media (max-width:899px) {
+  .tv-catalog .movie-grid { grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
+}

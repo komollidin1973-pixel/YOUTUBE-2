@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#0f0f0f">
   <title>YOUTUBE-2 — Kino olami</title>
-  <link rel="stylesheet" href="styles.css?v=20261128-tvgrid1">
+  <link rel="stylesheet" href="styles.css?v=20261128-fix2">
 </head>
 <body>
 <header class="topbar">
   <button class="icon-button menu-toggle" id="menuToggle" aria-label="Menyuni ochish">☰</button>
   <a class="brand" id="brandSecret" href="#" aria-label="YOUTUBE-2 bosh sahifa"><span class="brand-mark">▶</span><span>YOUTUBE<span class="brand-dash">-2</span></span></a>
   <form class="search" id="searchForm"><input id="searchInput" placeholder="Kinolarni qidirish..." aria-label="Qidirish"><button aria-label="Qidirish">⌕</button></form>
-  <button class="admin-button hidden" id="adminToggle" tabindex="-1" aria-hidden="true">Admin</button>
+  <button class="admin-button" id="adminToggle" type="button">Admin</button>
 </header>
 <aside class="sidebar" id="sidebar">
   <nav>
@@ -49,6 +49,22 @@
   </section>
   <footer>© <span id="footerYear"></span> YOUTUBE-2</footer>
 </main>
+
+<dialog class="movie-dialog" id="movieDialog">
+  <button class="dialog-close" id="dialogClose" type="button" aria-label="Yopish">×</button>
+  <div class="dialog-poster" id="dialogPoster"></div>
+  <div class="dialog-body">
+    <div class="eyebrow">YOUTUBE-2 KINO</div>
+    <h2 id="dialogTitle">Kino</h2>
+    <div class="movie-meta" id="dialogMeta"></div>
+    <p id="dialogDescription"></p>
+    <div class="dialog-actions">
+      <button class="primary-button" id="watchButton" type="button">▶ Ko‘rish</button>
+      <button class="secondary-button" id="favoriteButton" type="button">♡ Sevimlilarga</button>
+    </div>
+    <p class="source-note" id="sourceNote"></p>
+  </div>
+</dialog>
 
 <dialog class="player-dialog tv-player-dialog" id="playerDialog">
   <div class="tv-player-top"><div class="player-brand"><span class="brand-mark">▶</span><span id="playerTitle">YOUTUBE-2</span></div><button class="tv-control" id="playerClose" aria-label="Orqaga qaytish">✕ <span>Orqaga</span></button></div>
@@ -87,7 +103,7 @@
   window.YOUTUBE2_SUPABASE_URL = "https://wfipitfzczkighgsqntn.supabase.co";
   window.YOUTUBE2_SUPABASE_KEY = "sb_publishable_wZ-0jGIcVQ7ryZ-edLHlVA_pFhPXUCJ";
 </script>
-<script src="playerjs.js?v=20261128-tvgrid1"></script>
-<script src="app.js?v=20261128-tvgrid1"></script>
+<script src="playerjs.js?v=20261128-fix2"></script>
+<script src="app.js?v=20261128-fix2"></script>
 </body></html>
 
