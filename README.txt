@@ -1,21 +1,14 @@
-YOUTUBE-2 — YouTube uslubidagi Android TV dizayni
+YOUTUBE-2 TV GRID FIX
 
-GitHub repozitoriy asosiy papkasiga quyidagi 4 faylni joylang:
-- index.html
-- app.js
-- styles.css
-- playerjs.js
+Design updates:
+- Removed landscape movie-card layout and forced portrait 2:3 posters.
+- Fixed 3-column grid on Android TV / wide screens.
+- Movies flow down the page in normal vertical scrolling; no horizontal movie rails.
+- Added a compact top banner above the catalogue.
+- Kept the latest GitHub Player FIX app.js and existing Supabase settings.
 
-Eski shu nomli fayllarni almashtiring va Commit changes qiling.
+Upload these files to the root of the existing GitHub Pages repository, replacing:
+index.html, styles.css, app.js, playerjs.js
 
-O'zgarishlar:
-- Katta banner olib tashlandi; kino katalogi darhol ko'rinadi.
-- Kino kartochkasini OK bosib tanlash bilan player ochiladi.
-- MP4/M3U8/MPD/WebM bevosita manbalari PlayerJS'da ochiladi.
-- Embed sahifalari iframe orqali ochiladi.
-- Kichik yashirin admin: logotipni 1.2 soniya bosib turish yoki 2.2 soniyada 5 marta bosish.
-- Android TV pultidagi yo'nalish tugmalari bilan kino kartochkalari orasida yurish.
-- OK/Enter kino tanlaydi; Back/Escape playerdan qaytaradi.
-- Supabase katalogi, sevimlilar va admin panel saqlangan.
-
-Eslatma: PlayerJS uchinchi tomon iframe ichidagi playerni o'rnini bosa olmaydi. Bunday manbalar iframe sifatida qoladi.
+The HTML uses new cache-busting version strings (20261128-tvgrid1).
+No Supabase database/schema changes are required.
